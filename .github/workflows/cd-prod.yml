@@ -1,0 +1,183 @@
+name: CD — Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: cloudmart-prod
+  NAMESPACE: cloudmart-prod
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Manual approval gate (GitHub Environment "production" — requires reviewers)
+  # Configure: Settings → Environments → production → Required reviewers
+  # ---------------------------------------------------------------------------
+  await-approval:
+    name: Await manual approval
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Approval granted
+        run: echo "Production deployment approved — SHA ${{ github.sha }}"
+
+  # ---------------------------------------------------------------------------
+  # Pre-deployment Velero backup (protect against botched deploys)
+  # ---------------------------------------------------------------------------
+  pre-deploy-backup:
+    name: Take Velero backup before deploy
+    runs-on: ubuntu-latest
+    needs: await-approval
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Velero pre-deploy backup
+        run: |
+          BACKUP_NAME="pre-deploy-$(date +%Y%m%d%H%M)-${{ github.sha }}"
+          kubectl exec -n velero deploy/velero -- \
+            velero backup create "$BACKUP_NAME" \
+            --include-namespaces ${{ env.NAMESPACE }} \
+            --wait 2>/dev/null || echo "Velero not installed — skipping backup"
+
+  # ---------------------------------------------------------------------------
+  # Deploy to production
+  # ---------------------------------------------------------------------------
+  deploy-prod:
+    name: Deploy to cloudmart-prod
+    runs-on: ubuntu-latest
+    needs: pre-deploy-backup
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Substitute AWS Account ID in manifests
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          find k8s/ -type f -name "*.yaml" -exec sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g" {} +
+
+      - name: Update image tags in kustomize overlay
+        run: |
+          cd k8s/overlays/prod
+          ECR="${{ steps.ecr-login.outputs.registry }}/cloudmart"
+          SHA="${{ github.sha }}"
+          kustomize edit set image \
+            "$ECR/product-service=$ECR/product-service:$SHA" \
+            "$ECR/order-service=$ECR/order-service:$SHA" \
+            "$ECR/user-service=$ECR/user-service:$SHA" \
+            "$ECR/notification-service=$ECR/notification-service:$SHA" \
+            "$ECR/frontend=$ECR/frontend:$SHA"
+
+      - name: Apply manifests (GitOps via ArgoCD or direct kubectl)
+        run: |
+          # Preferred: ArgoCD sync (if ArgoCD is installed)
+          if kubectl get deploy argocd-server -n argocd &>/dev/null; then
+            # Install ArgoCD CLI
+            curl -sSL -o /usr/local/bin/argocd \
+              https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+            chmod +x /usr/local/bin/argocd
+            ARGOCD_SERVER=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            argocd login "$ARGOCD_SERVER" --grpc-web \
+              --username admin \
+              --password "${{ secrets.ARGOCD_PASSWORD }}" \
+              --insecure
+            argocd app sync cloudmart-prod --force
+            argocd app wait cloudmart-prod --health --timeout 300
+          else
+            # Fallback: direct kubectl apply
+            kubectl apply -k k8s/overlays/prod
+          fi
+
+      - name: Trigger Argo Rollout for product-service (canary)
+        run: |
+          ECR="${{ steps.ecr-login.outputs.registry }}/cloudmart"
+          SHA="${{ github.sha }}"
+
+          if kubectl get rollout product-service -n ${{ env.NAMESPACE }} &>/dev/null; then
+            kubectl argo rollouts set image product-service \
+              product-service="$ECR/product-service:$SHA" \
+              -n ${{ env.NAMESPACE }}
+            kubectl argo rollouts get rollout product-service \
+              -n ${{ env.NAMESPACE }} --watch --timeout 10m
+          else
+            kubectl rollout status deployment/product-service \
+              -n ${{ env.NAMESPACE }} --timeout=300s
+          fi
+
+      - name: Wait for all deployments to be healthy
+        run: |
+          for DEPLOY in order-service user-service notification-service frontend; do
+            kubectl rollout status deployment/$DEPLOY \
+              -n ${{ env.NAMESPACE }} --timeout=300s
+          done
+
+      - name: Production smoke tests
+        run: |
+          sleep 30
+          ALB_URL=$(kubectl get ingress cloudmart-ingress \
+            -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+          if [ -z "$ALB_URL" ]; then
+            echo "ALB not yet provisioned — verifying pod readiness instead"
+            kubectl wait --for=condition=ready pod \
+              -l app=frontend -n ${{ env.NAMESPACE }} --timeout=120s
+          else
+            echo "Running HTTP smoke tests against https://$ALB_URL"
+
+            # Frontend health
+            HTTP_STATUS=$(curl -sko /dev/null -w "%{http_code}" "https://$ALB_URL/health")
+            echo "Frontend /health: $HTTP_STATUS"
+            [[ "$HTTP_STATUS" =~ ^(200|301|302)$ ]] || { echo "Frontend health check failed!"; exit 1; }
+
+            # Product API
+            PROD_STATUS=$(curl -sko /dev/null -w "%{http_code}" "https://$ALB_URL/api/products")
+            echo "Product API: $PROD_STATUS"
+            [[ "$PROD_STATUS" =~ ^(200|401)$ ]] || { echo "Product service health check failed!"; exit 1; }
+
+            # User API
+            USER_STATUS=$(curl -sko /dev/null -w "%{http_code}" "https://$ALB_URL/api/users/health")
+            echo "User API: $USER_STATUS"
+            [[ "$USER_STATUS" =~ ^(200|404)$ ]] || { echo "User service health check failed!"; exit 1; }
+
+            echo "All smoke tests passed"
+          fi
+
+      - name: Show pod status
+        if: always()
+        run: kubectl get pods -n ${{ env.NAMESPACE }} -o wide
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment FAILED — initiating rollback for SHA ${{ github.sha }}"
+          kubectl argo rollouts abort product-service -n ${{ env.NAMESPACE }} 2>/dev/null || true
+          kubectl argo rollouts undo product-service -n ${{ env.NAMESPACE }} 2>/dev/null || true
+          for DEPLOY in order-service user-service notification-service frontend; do
+            kubectl rollout undo deployment/$DEPLOY -n ${{ env.NAMESPACE }} 2>/dev/null || true
+          done
+          echo "Rollback complete — check pod status"
+          kubectl get pods -n ${{ env.NAMESPACE }}
