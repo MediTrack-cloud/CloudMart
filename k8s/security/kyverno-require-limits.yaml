@@ -1,0 +1,32 @@
+# Require resource requests and limits on all containers in CloudMart namespaces.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests and Limits
+    policies.kyverno.io/description: >
+      All containers must declare CPU and memory requests and limits to prevent
+      resource starvation and ensure Kubernetes scheduling accuracy.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-cpu-memory
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [cloudmart-prod, cloudmart-staging]
+      validate:
+        message: "All containers must specify CPU and memory requests and limits."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
