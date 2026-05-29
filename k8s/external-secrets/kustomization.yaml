@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-secret-store.yaml
+  - product-service-es.yaml
+  - order-service-es.yaml
+  - user-service-es.yaml
+  - notification-service-es.yaml
