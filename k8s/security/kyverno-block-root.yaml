@@ -1,0 +1,62 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-root-and-privileged
+  annotations:
+    policies.kyverno.io/title: Disallow Root and Privileged Containers
+    policies.kyverno.io/description: >
+      Containers must not run as root or in privileged mode.
+      All CloudMart services already use non-root users in their Dockerfiles.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-not-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [cloudmart-prod, cloudmart-staging]
+      validate:
+        message: "Containers must not run as root. Set securityContext.runAsNonRoot=true."
+        pattern:
+          spec:
+            =(initContainers):
+              - =(securityContext):
+                  =(runAsNonRoot): "true"
+                  =(runAsUser): ">0"
+            containers:
+              - securityContext:
+                  runAsNonRoot: true
+                  =(runAsUser): ">0"
+
+    - name: check-not-privileged
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [cloudmart-prod, cloudmart-staging]
+      validate:
+        message: "Privileged containers are not allowed."
+        pattern:
+          spec:
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false"
+            containers:
+              - =(securityContext):
+                  =(privileged): "false"
+
+    - name: require-no-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [cloudmart-prod, cloudmart-staging]
+      validate:
+        message: "allowPrivilegeEscalation must be set to false."
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
