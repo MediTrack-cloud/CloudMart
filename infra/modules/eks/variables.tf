@@ -43,3 +43,8 @@ variable "private_app_subnet_ids" {
 variable "cluster_sg_id" {
   type = string
 }
+
+variable "github_actions_role_arn" {
+  type        = string
+  description = "IAM role ARN for GitHub Actions OIDC — added to aws-auth so the CD runner can call kubectl."
+}
