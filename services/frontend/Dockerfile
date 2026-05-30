@@ -13,6 +13,9 @@ RUN npm run build
 # ---- Stage 2: Serve with Nginx ----
 FROM nginx:1.27-alpine
 
+# Upgrade openssl/libcrypto to >=3.3.7-r0 to fix CVE-2026-31789 (CRITICAL)
+RUN apk upgrade --no-cache libcrypto3 libssl3
+
 RUN rm /etc/nginx/conf.d/default.conf
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
