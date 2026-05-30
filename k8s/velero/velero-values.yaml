@@ -25,7 +25,6 @@ initContainers:
 serviceAccount:
   server:
     annotations:
-      # Replace ACCOUNT_ID and ROLE_ID with values from Terraform output
       eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-velero-role-staging
 
 credentials:

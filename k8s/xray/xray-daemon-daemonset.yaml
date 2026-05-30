@@ -15,7 +15,6 @@ metadata:
   name: xray-daemon
   namespace: xray
   annotations:
-    # Replace ACCOUNT_ID with Terraform output: module.iam.xray_role_arn
     eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-xray-role-staging
 ---
 apiVersion: apps/v1
