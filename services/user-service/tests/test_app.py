@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 os.environ["DB_BACKEND"] = "memory"
 os.environ["JWT_SECRET"] = "test-secret"
 
-from app import app as flask_app
+from app import app as flask_app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

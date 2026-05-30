@@ -196,7 +196,7 @@ class DynamoDBStore:
 
     def __init__(self):
         import boto3
-        from boto3.dynamodb.conditions import Key, Attr
+        from boto3.dynamodb.conditions import Attr
         self._Attr = Attr
         region = os.environ.get("AWS_REGION", "us-east-1")
         table_name = os.environ["DYNAMODB_TABLE"]
