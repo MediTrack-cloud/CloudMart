@@ -60,6 +60,14 @@ NAMESPACE="cloudmart-$ENV"
 CLUSTER="cloudmart-$ENV"
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"     # Always resolve to repo root
 
+# Non-destructive build: placeholder substitution and Terraform-output injection
+# happen on a throwaway COPY of k8s/, so the tracked source files are never
+# mutated (they stay as ACCOUNT_ID / __REGION__ placeholders in git).
+K8S_DIR="$(mktemp -d)/k8s"
+cp -R "$ROOT_DIR/k8s" "$K8S_DIR"
+trap 'rm -rf "$(dirname "$K8S_DIR")"' EXIT
+log "Rendering manifests into throwaway build dir: $K8S_DIR"
+
 # ── Export Terraform variables from .env ────────────────────────────────────
 [[ -n "${GITHUB_ORG:-}" ]] || die "GITHUB_ORG is required. Set it in .env (see .env.example)."
 export TF_VAR_aws_region="$AWS_REGION"
@@ -73,7 +81,7 @@ export TF_VAR_owner_email="${OWNER_EMAIL:-team@cloudmart.example}"
 # ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
 # (k8s/helm/* is excluded — Helm renders the registry from its own values.)
 log "Substituting ACCOUNT_ID=$ACCOUNT_ID and region=$AWS_REGION in k8s/ manifests …"
-find "$ROOT_DIR/k8s" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
+find "$K8S_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
   sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" "$f"
 done
 log "Placeholder substitution complete."
@@ -117,7 +125,7 @@ VPC_ID=$(aws ec2 describe-vpcs --region "$AWS_REGION" \
 cd "$ROOT_DIR"
 
 # ── 6  Patch Ingress: ensure an ACM cert exists and inject it for HTTPS ──────
-INGRESS_FILE="$ROOT_DIR/k8s/base/frontend/ingress.yaml"
+INGRESS_FILE="$K8S_DIR/base/frontend/ingress.yaml"
 SELF_SIGNED_CERT_NAME="cloudmart-selfsigned-$ENV"
 if [[ -z "${ACM_CERT_ARN:-}" ]]; then
   # Reuse a previously-imported self-signed cert if present (tag-matched)
@@ -163,28 +171,28 @@ sedi '/external-dns.alpha.kubernetes.io/d' "$INGRESS_FILE"
 # ── 7  Inject dynamic role ARNs into Helm values & manifests ─────────────────
 log "Injecting Terraform‐generated role ARNs into Helm value files …"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-lb-controller-role-.*|$LB_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/aws-load-balancer-controller.yaml"
+  "$K8S_DIR/helm-values/aws-load-balancer-controller.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-cluster-autoscaler-role-.*|$AS_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/cluster-autoscaler.yaml"
+  "$K8S_DIR/helm-values/cluster-autoscaler.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-external-secrets-role-.*|$ES_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/external-secrets.yaml"
+  "$K8S_DIR/helm-values/external-secrets.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-velero-role-.*|$VELERO_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/velero/velero-values.yaml"
+  "$K8S_DIR/velero/velero-values.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-xray-role-.*|$XRAY_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/xray/xray-daemon-daemonset.yaml"
+  "$K8S_DIR/xray/xray-daemon-daemonset.yaml"
 
 # Patch cluster name in Helm value files for current environment
 sedi "s/clusterName: cloudmart-.*/clusterName: $CLUSTER_NAME/" \
-  "$ROOT_DIR/k8s/helm-values/aws-load-balancer-controller.yaml"
+  "$K8S_DIR/helm-values/aws-load-balancer-controller.yaml"
 
 # Patch velero bucket name
 sedi "s|cloudmart-velero-.*$ACCOUNT_ID|cloudmart-velero-$ACCOUNT_ID|" \
-  "$ROOT_DIR/k8s/velero/velero-values.yaml"
+  "$K8S_DIR/velero/velero-values.yaml"
 
 # Patch KEDA SQS URL
-KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject-staging.yaml"
+KEDA_FILE="$K8S_DIR/keda/notification-service-scaledobject-staging.yaml"
 if [[ "$ENV" == "prod" ]]; then
-  KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject.yaml"
+  KEDA_FILE="$K8S_DIR/keda/notification-service-scaledobject.yaml"
 fi
 sedi "s|https://sqs\.[^.]*\.amazonaws\.com/.*|$SQS_URL\"|" "$KEDA_FILE"
 
@@ -217,7 +225,7 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
 
 helm upgrade --install metrics-server metrics-server/metrics-server \
   -n kube-system --wait \
-  -f "$ROOT_DIR/k8s/helm-values/metrics-server.yaml"
+  -f "$K8S_DIR/helm-values/metrics-server.yaml"
 
 helm upgrade --install external-secrets external-secrets/external-secrets \
   -n external-secrets --create-namespace --wait \
@@ -227,7 +235,7 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
 
 helm upgrade --install keda kedacore/keda \
   -n keda --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/keda.yaml"
+  -f "$K8S_DIR/helm-values/keda.yaml"
 
 # Annotate KEDA operator SA with IRSA role for SQS queue-depth polling
 kubectl annotate serviceaccount keda-operator -n keda \
@@ -236,7 +244,7 @@ kubectl rollout restart deployment/keda-operator -n keda
 
 helm upgrade --install kyverno kyverno/kyverno \
   -n kyverno --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/kyverno.yaml"
+  -f "$K8S_DIR/helm-values/kyverno.yaml"
 
 helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   -n kube-system --wait \
@@ -246,21 +254,21 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
 
 helm upgrade --install argo-rollouts argo/argo-rollouts \
   -n argo-rollouts --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/argo-rollouts.yaml"
+  -f "$K8S_DIR/helm-values/argo-rollouts.yaml"
 
 helm upgrade --install velero vmware-tanzu/velero \
   -n velero --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/velero/velero-values.yaml" || warn "Velero install skipped (non-fatal)."
+  -f "$K8S_DIR/velero/velero-values.yaml" || warn "Velero install skipped (non-fatal)."
 
 # ── 10  Apply Kubernetes manifests ───────────────────────────────────────────
 log "Applying Kyverno cluster policies …"
-kubectl apply -f "$ROOT_DIR/k8s/security/"
+kubectl apply -f "$K8S_DIR/security/"
 
 log "Applying X-Ray daemon …"
-kubectl apply -f "$ROOT_DIR/k8s/xray/"
+kubectl apply -f "$K8S_DIR/xray/"
 
 log "Applying Kustomize overlay ($ENV) …"
-kustomize build --load-restrictor LoadRestrictionsNone "$ROOT_DIR/k8s/overlays/$ENV" | kubectl apply -f -
+kustomize build --load-restrictor LoadRestrictionsNone "$K8S_DIR/overlays/$ENV" | kubectl apply -f -
 
 log "Applying KEDA ScaledObject …"
 kubectl apply -f "$KEDA_FILE"
@@ -285,11 +293,11 @@ done
 # Pin the running workloads to the immutable tag just pushed.
 log "Pinning overlay images to tag $IMAGE_TAG …"
 ECR="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart"
-( cd "$ROOT_DIR/k8s/overlays/$ENV" && \
+( cd "$K8S_DIR/overlays/$ENV" && \
   for SVC in product-service order-service user-service notification-service frontend; do
     kustomize edit set image "$ECR/$SVC=$ECR/$SVC:$IMAGE_TAG" 2>/dev/null || true
   done )
-kustomize build --load-restrictor LoadRestrictionsNone "$ROOT_DIR/k8s/overlays/$ENV" | kubectl apply -f -
+kustomize build --load-restrictor LoadRestrictionsNone "$K8S_DIR/overlays/$ENV" | kubectl apply -f -
 
 # ── 12  Restart deployments ──────────────────────────────────────────────────
 log "Rolling restart to pick up new images …"
