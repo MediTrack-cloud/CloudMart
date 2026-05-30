@@ -9,7 +9,7 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "cloudmart-${var.environment}" }
+  tags                 = { Name = "cloudmart-${var.environment}" }
 }
 
 # ---------------------------------------------------------------------------
@@ -22,8 +22,8 @@ resource "aws_subnet" "public" {
   availability_zone       = local.azs[count.index]
   map_public_ip_on_launch = true
   tags = {
-    Name                                          = "cloudmart-public-${local.azs[count.index]}"
-    "kubernetes.io/role/elb"                      = "1"
+    Name                                                 = "cloudmart-public-${local.azs[count.index]}"
+    "kubernetes.io/role/elb"                             = "1"
     "kubernetes.io/cluster/cloudmart-${var.environment}" = "shared"
   }
 }
@@ -37,8 +37,8 @@ resource "aws_subnet" "private_app" {
   cidr_block        = var.private_app_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
   tags = {
-    Name                                          = "cloudmart-private-app-${local.azs[count.index]}"
-    "kubernetes.io/role/internal-elb"             = "1"
+    Name                                                 = "cloudmart-private-app-${local.azs[count.index]}"
+    "kubernetes.io/role/internal-elb"                    = "1"
     "kubernetes.io/cluster/cloudmart-${var.environment}" = "owned"
   }
 }
@@ -51,7 +51,7 @@ resource "aws_subnet" "private_data" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_data_subnet_cidrs[count.index]
   availability_zone = local.azs[count.index]
-  tags = { Name = "cloudmart-private-data-${local.azs[count.index]}" }
+  tags              = { Name = "cloudmart-private-data-${local.azs[count.index]}" }
 }
 
 # ---------------------------------------------------------------------------
@@ -202,18 +202,24 @@ resource "aws_security_group" "rds" {
   tags = { Name = "cloudmart-rds-sg-${var.environment}" }
 }
 
-# Bastion host — SSH access from the internet (restrict to known IPs in production)
+# Bastion host — SSH access restricted to explicit admin CIDRs (least privilege).
+# If bastion_allowed_cidrs is empty the SG has NO inbound SSH rule (fail closed):
+# prefer SSM Session Manager (node role already has AmazonSSMManagedInstanceCore)
+# over an internet-exposed SSH port.
 resource "aws_security_group" "bastion" {
   name        = "cloudmart-bastion-sg-${var.environment}"
-  description = "Bastion: SSH inbound from approved CIDR only"
+  description = "Bastion: SSH inbound from approved admin CIDRs only"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description = "SSH from approved management IPs (tighten in production)"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # TODO: Lock down to admin CIDR in production; left open for demo
+  dynamic "ingress" {
+    for_each = length(var.bastion_allowed_cidrs) > 0 ? [1] : []
+    content {
+      description = "SSH from approved management CIDRs only"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = var.bastion_allowed_cidrs
+    }
   }
   egress {
     description = "SSH to EKS nodes / RDS in private subnets"
@@ -232,7 +238,7 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = concat(
+  route_table_ids = concat(
     [aws_route_table.public.id],
     aws_route_table.private_app[*].id,
     [aws_route_table.private_data.id],
@@ -244,7 +250,7 @@ resource "aws_vpc_endpoint" "dynamodb" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.aws_region}.dynamodb"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = concat(
+  route_table_ids = concat(
     [aws_route_table.public.id],
     aws_route_table.private_app[*].id,
     [aws_route_table.private_data.id],
@@ -259,7 +265,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   subnet_ids          = aws_subnet.private_app[*].id
   security_group_ids  = [aws_security_group.eks_nodes.id]
   private_dns_enabled = true
-  tags = { Name = "cloudmart-secretsmanager-endpoint-${var.environment}" }
+  tags                = { Name = "cloudmart-secretsmanager-endpoint-${var.environment}" }
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
@@ -269,7 +275,7 @@ resource "aws_vpc_endpoint" "ecr_api" {
   subnet_ids          = aws_subnet.private_app[*].id
   security_group_ids  = [aws_security_group.eks_nodes.id]
   private_dns_enabled = true
-  tags = { Name = "cloudmart-ecr-api-endpoint-${var.environment}" }
+  tags                = { Name = "cloudmart-ecr-api-endpoint-${var.environment}" }
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
@@ -279,7 +285,7 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   subnet_ids          = aws_subnet.private_app[*].id
   security_group_ids  = [aws_security_group.eks_nodes.id]
   private_dns_enabled = true
-  tags = { Name = "cloudmart-ecr-dkr-endpoint-${var.environment}" }
+  tags                = { Name = "cloudmart-ecr-dkr-endpoint-${var.environment}" }
 }
 
 # ---------------------------------------------------------------------------

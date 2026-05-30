@@ -4,14 +4,18 @@ team_id            = "group-01"
 owner_email        = "madhuraweerasooriye@gmail.com"
 single_nat_gateway = false
 rds_multi_az       = true
-eks_min_nodes      = 2
-eks_max_nodes      = 6
-db_instance_class  = "db.t3.small"
-monthly_budget_usd = "50"
+
+# Least privilege: set to your admin/VPN IP(s), e.g. ["203.0.113.10/32"].
+# Leave empty to disable inbound SSH entirely and use SSM Session Manager.
+bastion_allowed_cidrs = []
+eks_min_nodes         = 2
+eks_max_nodes         = 6
+db_instance_class     = "db.t3.small"
+monthly_budget_usd    = "50"
 
 # Set these before applying:
 alert_email    = "madhuraweerasooriye@gmail.com"
-ses_from_email = ""        # Set to verified SES sender email, e.g. "noreply@yourdomain.com"
+ses_from_email = "" # Set to verified SES sender email, e.g. "noreply@yourdomain.com"
 
 # Optional — uncomment once domain is registered in Route 53:
 # domain_name  = "cloudmart.yourdomain.com"

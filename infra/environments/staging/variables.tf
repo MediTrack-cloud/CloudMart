@@ -23,6 +23,12 @@ variable "single_nat_gateway" {
   default = true
 }
 
+variable "bastion_allowed_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Admin CIDRs allowed to SSH the bastion (least privilege). Empty = no inbound SSH; use SSM Session Manager instead."
+}
+
 variable "rds_multi_az" {
   type    = bool
   default = false

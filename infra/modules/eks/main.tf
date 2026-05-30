@@ -106,7 +106,7 @@ resource "aws_launch_template" "nodes" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"    # IMDSv2 mandatory
+    http_tokens                 = "required" # IMDSv2 mandatory
     http_put_response_hop_limit = 1
   }
 
