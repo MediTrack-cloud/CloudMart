@@ -1,0 +1,85 @@
+# AWS X-Ray daemon — runs on every node and forwards traces to X-Ray service.
+# The daemon listens on UDP 2000; services send segments via XRAY_DAEMON_ADDRESS env var.
+# Install: kubectl apply -f k8s/xray/
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xray
+  labels:
+    app.kubernetes.io/managed-by: terraform
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xray-daemon
+  namespace: xray
+  annotations:
+    # Replace 898865655202 with Terraform output: module.iam.xray_role_arn
+    eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-xray-role-staging
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: xray-daemon
+  namespace: xray
+  labels:
+    app: xray-daemon
+spec:
+  selector:
+    matchLabels:
+      app: xray-daemon
+  template:
+    metadata:
+      labels:
+        app: xray-daemon
+    spec:
+      serviceAccountName: xray-daemon
+      hostNetwork: false
+      containers:
+        - name: xray-daemon
+          image: amazon/aws-xray-daemon:3.x
+          command: ["/usr/bin/xray", "-b", "0.0.0.0:2000", "-l", "prod", "--local-mode"]
+          ports:
+            - name: xray-ingest
+              containerPort: 2000
+              hostPort: 2000
+              protocol: UDP
+          resources:
+            requests:
+              cpu: 32m
+              memory: 24Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# ClusterIP service so pods can reach the daemon by DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: xray-service
+  namespace: xray
+spec:
+  selector:
+    app: xray-daemon
+  clusterIP: None
+  ports:
+    - name: xray-ingest
+      port: 2000
+      protocol: UDP

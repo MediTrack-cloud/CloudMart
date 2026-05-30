@@ -1,0 +1,31 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-aws-credentials
+  namespace: cloudmart-staging
+spec:
+  podIdentity:
+    provider: aws
+    identityOwner: keda
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service-scaler
+  namespace: cloudmart-staging
+spec:
+  scaleTargetRef:
+    name: notification-service
+  minReplicaCount: 0
+  maxReplicaCount: 2
+  cooldownPeriod: 60
+  pollingInterval: 30
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: "https://sqs.us-east-1.amazonaws.com/898865655202/cloudmart-orders-staging"
+        queueLength: "10"
+        awsRegion: "us-east-1"
+        identityOwner: pod
+      authenticationRef:
+        name: keda-aws-credentials
