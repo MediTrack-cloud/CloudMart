@@ -30,7 +30,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: product-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/product-service:1.0.0
+          image: ACCOUNT_ID.dkr.ecr.__REGION__.amazonaws.com/cloudmart/product-service:1.0.0
           ports:
             - containerPort: 8001
           env:

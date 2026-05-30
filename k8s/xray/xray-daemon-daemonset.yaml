@@ -15,8 +15,8 @@ metadata:
   name: xray-daemon
   namespace: xray
   annotations:
-    # Replace 898865655202 with Terraform output: module.iam.xray_role_arn
-    eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-xray-role-staging
+    # Replace ACCOUNT_ID with Terraform output: module.iam.xray_role_arn
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-xray-role-staging
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -54,7 +54,7 @@ spec:
               memory: 64Mi
           env:
             - name: AWS_REGION
-              value: us-east-1
+              value: __REGION__
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

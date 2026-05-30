@@ -42,13 +42,13 @@ while getopts "e:" opt; do
 done
 [[ "$ENV" == "staging" || "$ENV" == "prod" ]] || die "Environment must be 'staging' or 'prod'."
 
-# ── 2  AWS identity ──────────────────────────────────────────────────────────
-EXPECTED_ACCOUNT_ID="898865655202"
+# ── 2  AWS identity (resolved dynamically — nothing hardcoded) ───────────────
 log "Verifying AWS credentials …"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null) \
   || die "Not authenticated. Check AWS_PROFILE ($AWS_PROFILE) or run 'aws configure'."
-[[ "$ACCOUNT_ID" == "$EXPECTED_ACCOUNT_ID" ]] \
-  || die "Account mismatch: resolved $ACCOUNT_ID but expected $EXPECTED_ACCOUNT_ID. Check AWS_PROFILE in .env"
+if [[ -n "${EXPECTED_ACCOUNT_ID:-}" && "$ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+  die "Account mismatch: resolved $ACCOUNT_ID but EXPECTED_ACCOUNT_ID=$EXPECTED_ACCOUNT_ID."
+fi
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
 NAMESPACE="cloudmart-$ENV"

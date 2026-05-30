@@ -15,7 +15,7 @@ spec:
       metadata:
         queueURL: SQS_QUEUE_URL_PLACEHOLDER
         queueLength: "5"
-        awsRegion: us-east-1
+        awsRegion: __REGION__
         identityOwner: operator
 ---
 apiVersion: keda.sh/v1alpha1

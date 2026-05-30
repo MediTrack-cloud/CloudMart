@@ -23,9 +23,9 @@ spec:
   triggers:
     - type: aws-sqs-queue
       metadata:
-        queueURL: "https://sqs.us-east-1.amazonaws.com/898865655202/cloudmart-orders-staging"
+        queueURL: "https://sqs.__REGION__.amazonaws.com/ACCOUNT_ID/cloudmart-orders-staging"
         queueLength: "10"
-        awsRegion: "us-east-1"
+        awsRegion: "__REGION__"
         identityOwner: pod
       authenticationRef:
         name: keda-aws-credentials

@@ -13,7 +13,7 @@ data:
   PRODUCT_SERVICE_URL:   "http://product-service:8001"
   ORDER_SERVICE_URL:     "http://order-service:8002"
   # AWS Config
-  AWS_REGION:            "us-east-1"
+  AWS_REGION:            "__REGION__"
   # App Config
   JWT_EXPIRY_HOURS:      "24"
   POLL_INTERVAL_MS:      "5000"

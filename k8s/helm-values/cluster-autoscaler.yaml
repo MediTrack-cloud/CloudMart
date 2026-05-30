@@ -4,12 +4,12 @@
 autoDiscovery:
   clusterName: cloudmart-prod
 
-awsRegion: us-east-1
+awsRegion: __REGION__
 
 rbac:
   serviceAccount:
     annotations:
-      eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-cluster-autoscaler-role-staging
+      eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-cluster-autoscaler-role-staging
 
 extraArgs:
   balance-similar-node-groups: "true"

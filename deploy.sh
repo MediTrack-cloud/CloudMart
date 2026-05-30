@@ -44,13 +44,15 @@ while getopts "e:" opt; do
 done
 [[ "$ENV" == "staging" || "$ENV" == "prod" ]] || die "Environment must be 'staging' or 'prod'."
 
-# ── 2  AWS identity ──────────────────────────────────────────────────────────
-EXPECTED_ACCOUNT_ID="898865655202"
+# ── 2  AWS identity (resolved dynamically — nothing hardcoded) ───────────────
 log "Verifying AWS credentials …"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null) \
   || die "Not authenticated. Check AWS_PROFILE ($AWS_PROFILE) or run 'aws configure'."
-[[ "$ACCOUNT_ID" == "$EXPECTED_ACCOUNT_ID" ]] \
-  || die "Account mismatch: resolved $ACCOUNT_ID but expected $EXPECTED_ACCOUNT_ID. Check AWS_PROFILE in .env"
+# Optional guard: set EXPECTED_ACCOUNT_ID in .env to prevent deploying to the wrong
+# account. Unset = deploy to whichever account the credentials resolve to.
+if [[ -n "${EXPECTED_ACCOUNT_ID:-}" && "$ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+  die "Account mismatch: resolved $ACCOUNT_ID but EXPECTED_ACCOUNT_ID=$EXPECTED_ACCOUNT_ID."
+fi
 AWS_REGION="${AWS_REGION:-us-east-1}"
 log "Account $ACCOUNT_ID  |  Region $AWS_REGION  |  Env $ENV"
 
@@ -68,12 +70,12 @@ export TF_VAR_ses_from_email="${SES_FROM_EMAIL:-}"
 export TF_VAR_monthly_budget_usd="${MONTHLY_BUDGET_USD:-30}"
 export TF_VAR_owner_email="${OWNER_EMAIL:-team@cloudmart.example}"
 
-# ── 3  Substitute ACCOUNT_ID in every k8s YAML ──────────────────────────────
-log "Replacing ACCOUNT_ID placeholders in k8s/ manifests …"
-find "$ROOT_DIR/k8s" -type f -name '*.yaml' -exec \
-  grep -l 'ACCOUNT_ID' {} + 2>/dev/null | while read -r f; do
-    sedi "s/ACCOUNT_ID/$ACCOUNT_ID/g" "$f"
-  done || true
+# ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
+# (k8s/helm/* is excluded — Helm renders the registry from its own values.)
+log "Substituting ACCOUNT_ID=$ACCOUNT_ID and region=$AWS_REGION in k8s/ manifests …"
+find "$ROOT_DIR/k8s" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
+  sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" "$f"
+done
 log "Placeholder substitution complete."
 
 # ── 4  Bootstrap — Terraform remote state ────────────────────────────────────
@@ -134,7 +136,7 @@ if [[ -z "${ACM_CERT_ARN:-}" ]]; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
       -keyout "$CERT_DIR/tls.key" -out "$CERT_DIR/tls.crt" \
       -subj "/CN=cloudmart-demo/O=CloudMart/C=US" \
-      -addext "subjectAltName=DNS:*.us-east-1.elb.amazonaws.com,DNS:*.elb.amazonaws.com,DNS:cloudmart-demo,DNS:localhost" \
+      -addext "subjectAltName=DNS:*.$AWS_REGION.elb.amazonaws.com,DNS:*.elb.amazonaws.com,DNS:cloudmart-demo,DNS:localhost" \
       >/dev/null 2>&1
     ACM_CERT_ARN=$(aws acm import-certificate --region "$AWS_REGION" \
       --certificate "fileb://$CERT_DIR/tls.crt" \
@@ -150,10 +152,10 @@ else
   log "Using user-provided ACM_CERT_ARN for HTTPS."
 fi
 log "Injecting ACM certificate ARN into Ingress …"
-sedi "s|arn:aws:acm:us-east-1:.*:certificate/CERT_ID|$ACM_CERT_ARN|g" "$INGRESS_FILE"
+sedi "s|arn:aws:acm:[^:]*:[^:]*:certificate/CERT_ID|$ACM_CERT_ARN|g" "$INGRESS_FILE"
 
 # Inject real WAF ARN
-sedi "s|arn:aws:wafv2:us-east-1:.*:regional/webacl/cloudmart-waf-ENV/WAF_ID|$WAF_ARN|g" "$INGRESS_FILE"
+sedi "s|arn:aws:wafv2:[^:]*:[^:]*:regional/webacl/cloudmart-waf-ENV/WAF_ID|$WAF_ARN|g" "$INGRESS_FILE"
 # Remove host matching so the ALB responds on any hostname
 sedi "s|host: cloudmart.example|# host: (removed — using ALB DNS)|" "$INGRESS_FILE"
 sedi '/external-dns.alpha.kubernetes.io/d' "$INGRESS_FILE"
@@ -184,7 +186,7 @@ KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject-staging.yaml"
 if [[ "$ENV" == "prod" ]]; then
   KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject.yaml"
 fi
-sedi "s|https://sqs.us-east-1.amazonaws.com/.*|$SQS_URL\"|" "$KEDA_FILE"
+sedi "s|https://sqs\.[^.]*\.amazonaws\.com/.*|$SQS_URL\"|" "$KEDA_FILE"
 
 # ── 8  Connect kubectl ───────────────────────────────────────────────────────
 log "Connecting kubectl to EKS cluster $CLUSTER_NAME …"

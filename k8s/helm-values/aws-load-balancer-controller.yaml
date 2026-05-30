@@ -7,7 +7,7 @@ serviceAccount:
   create: true
   name: aws-load-balancer-controller
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-lb-controller-role-staging
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-lb-controller-role-staging
 
 replicaCount: 2
 

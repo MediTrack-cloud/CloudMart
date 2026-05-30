@@ -30,9 +30,9 @@ spec:
     - type: aws-sqs-queue
       metadata:
         # Replace with Terraform output: module.sqs.queue_url
-        queueURL: "https://sqs.us-east-1.amazonaws.com/898865655202/cloudmart-orders-prod"
+        queueURL: "https://sqs.__REGION__.amazonaws.com/ACCOUNT_ID/cloudmart-orders-prod"
         queueLength: "5"          # scale up when 5+ messages per replica
-        awsRegion: "us-east-1"
+        awsRegion: "__REGION__"
         identityOwner: keda
       authenticationRef:
         name: keda-aws-credentials
