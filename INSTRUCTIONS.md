@@ -1,8 +1,8 @@
 # CloudMart — End-to-End Instructions
 
 > **Cloud Provider:** AWS  
-> **Region:** `us-east-1` (hardcoded throughout Terraform, workflows, and scripts per guideline)  
-> **Kubernetes:** Amazon EKS (v1.29)  
+> **Region:** `us-east-1` (default; parameterized via `AWS_REGION` / `TF_VAR_aws_region` — nothing hardcoded)  
+> **Kubernetes:** Amazon EKS (v1.30)  
 > **Team:** group-01  
 > **Branch strategy:** `main` → production, `develop` → staging, `feature/*` → development
 
