@@ -222,6 +222,13 @@ app.post('/orders', async (req, res) => {
     });
 
     console.log(`[Order] Created: ${order.id} — $${order.total} — ${order.items.length} items`);
+    console.log(JSON.stringify({
+      message: 'Order created',
+      orderId: order.id,
+      userId: order.userId,
+      total: order.total,
+      itemCount: order.items.length,
+    }));
     res.status(201).json(order);
   } catch (err) {
     console.error('[Order] Error creating order:', err.message);

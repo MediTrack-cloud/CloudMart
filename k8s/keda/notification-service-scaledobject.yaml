@@ -1,7 +1,4 @@
-# KEDA ScaledObject — scales notification-service based on SQS queue depth.
-# Requires KEDA to be installed: helm install keda kedacore/keda -n keda --create-namespace
-# Replace SQS_QUEUE_URL with value from Terraform output: module.sqs.queue_url
-
+# KEDA ScaledObject — scales notification-service on SQS queue depth.
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
@@ -29,10 +26,9 @@ spec:
   triggers:
     - type: aws-sqs-queue
       metadata:
-        # Replace with Terraform output: module.sqs.queue_url
-        queueURL: "https://sqs.us-east-1.amazonaws.com/898865655202/cloudmart-orders-prod"
+        queueURL: "https://sqs.__REGION__.amazonaws.com/ACCOUNT_ID/cloudmart-orders-prod"
         queueLength: "5"          # scale up when 5+ messages per replica
-        awsRegion: "us-east-1"
+        awsRegion: "__REGION__"
         identityOwner: keda
       authenticationRef:
         name: keda-aws-credentials

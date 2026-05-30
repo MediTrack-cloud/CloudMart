@@ -27,7 +27,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: notification-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/notification-service:latest
+          image: ACCOUNT_ID.dkr.ecr.__REGION__.amazonaws.com/cloudmart/notification-service:1.0.0
           ports:
             - containerPort: 8004
           env:
@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: cloudmart-notification-secrets
                   key: FROM_EMAIL
+            - name: DEMO_RECIPIENT_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: DEMO_RECIPIENT_EMAIL
             - name: AWS_REGION
               valueFrom:
                 configMapKeyRef:

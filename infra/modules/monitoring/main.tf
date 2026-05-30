@@ -21,11 +21,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type   = "metric"
-        x = 0, y = 0, width = 12, height = 6
+        type = "metric"
+        x    = 0, y = 0, width = 12, height = 6
         properties = {
-          title  = "EKS Node CPU Utilization"
-          view   = "timeSeries"
+          title   = "EKS Node CPU Utilization"
+          view    = "timeSeries"
           stacked = false
           metrics = [
             ["ContainerInsights", "node_cpu_utilization", "ClusterName", "cloudmart-${var.environment}"]
@@ -35,11 +35,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
         }
       },
       {
-        type   = "metric"
-        x = 12, y = 0, width = 12, height = 6
+        type = "metric"
+        x    = 12, y = 0, width = 12, height = 6
         properties = {
-          title  = "EKS Node Memory Utilization"
-          view   = "timeSeries"
+          title = "EKS Node Memory Utilization"
+          view  = "timeSeries"
           metrics = [
             ["ContainerInsights", "node_memory_utilization", "ClusterName", "cloudmart-${var.environment}"]
           ]
@@ -48,11 +48,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
         }
       },
       {
-        type   = "metric"
-        x = 0, y = 6, width = 12, height = 6
+        type = "metric"
+        x    = 0, y = 6, width = 12, height = 6
         properties = {
-          title  = "SQS Queue Depth (Orders)"
-          view   = "timeSeries"
+          title = "SQS Queue Depth (Orders)"
+          view  = "timeSeries"
           metrics = [
             ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "cloudmart-orders-${var.environment}"],
             ["AWS/SQS", "ApproximateNumberOfMessagesNotVisible", "QueueName", "cloudmart-orders-${var.environment}"]
@@ -62,11 +62,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
         }
       },
       {
-        type   = "metric"
-        x = 12, y = 6, width = 12, height = 6
+        type = "metric"
+        x    = 12, y = 6, width = 12, height = 6
         properties = {
-          title  = "RDS Connections & CPU"
-          view   = "timeSeries"
+          title = "RDS Connections & CPU"
+          view  = "timeSeries"
           metrics = [
             ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "cloudmart-${var.environment}"],
             ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "cloudmart-${var.environment}"]
@@ -76,11 +76,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
         }
       },
       {
-        type   = "metric"
-        x = 0, y = 12, width = 24, height = 6
+        type = "metric"
+        x    = 0, y = 12, width = 24, height = 6
         properties = {
-          title  = "ALB Request Count & 5XX Errors"
-          view   = "timeSeries"
+          title = "ALB Request Count & 5XX Errors"
+          view  = "timeSeries"
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/cloudmart-${var.environment}"],
             ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "app/cloudmart-${var.environment}"]
@@ -153,7 +153,7 @@ resource "aws_cloudwatch_log_metric_filter" "order_throughput" {
   name           = "cloudmart-order-throughput-${var.environment}"
   log_group_name = "/cloudmart/order-service/${var.environment}"
   # Matches log lines emitted when an order is successfully created
-  pattern        = "{ $.message = \"Order created\" }"
+  pattern = "{ $.message = \"Order created\" }"
 
   metric_transformation {
     name          = "OrdersPerMinute"
@@ -233,11 +233,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart_extended" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type   = "metric"
-        x = 0, y = 0, width = 12, height = 6
+        type = "metric"
+        x    = 0, y = 0, width = 12, height = 6
         properties = {
-          title  = "Order Throughput (orders/min)"
-          view   = "timeSeries"
+          title = "Order Throughput (orders/min)"
+          view  = "timeSeries"
           metrics = [
             ["CloudMart/${var.environment}", "OrdersPerMinute"]
           ]
@@ -247,11 +247,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart_extended" {
         }
       },
       {
-        type   = "metric"
-        x = 12, y = 0, width = 12, height = 6
+        type = "metric"
+        x    = 12, y = 0, width = 12, height = 6
         properties = {
-          title  = "Product Service Error Rate"
-          view   = "timeSeries"
+          title = "Product Service Error Rate"
+          view  = "timeSeries"
           metrics = [
             ["CloudMart/${var.environment}", "ProductService5xxCount"]
           ]
@@ -260,11 +260,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart_extended" {
         }
       },
       {
-        type   = "metric"
-        x = 0, y = 6, width = 12, height = 6
+        type = "metric"
+        x    = 0, y = 6, width = 12, height = 6
         properties = {
-          title  = "SQS Queue Depth"
-          view   = "timeSeries"
+          title = "SQS Queue Depth"
+          view  = "timeSeries"
           metrics = [
             ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "cloudmart-orders-${var.environment}"]
           ]
@@ -273,11 +273,11 @@ resource "aws_cloudwatch_dashboard" "cloudmart_extended" {
         }
       },
       {
-        type   = "metric"
-        x = 12, y = 6, width = 12, height = 6
+        type = "metric"
+        x    = 12, y = 6, width = 12, height = 6
         properties = {
-          title  = "ALB Request Count & 5XX Errors"
-          view   = "timeSeries"
+          title = "ALB Request Count & 5XX Errors"
+          view  = "timeSeries"
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/cloudmart-${var.environment}"],
             ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "app/cloudmart-${var.environment}"]

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 770" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ad" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#334155"/></marker>
+    <marker id="ao" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#f59e0b"/></marker>
+    <marker id="ab" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#4a9eed"/></marker>
+    <marker id="ac" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#06b6d4"/></marker>
+    <marker id="ap" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8b5cf6"/></marker>
+  </defs>
+  <rect width="1180" height="770" fill="#ffffff"/>
+  <text x="590" y="32" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">D1 — CloudMart Network Architecture (AWS VPC, us-east-1)</text>
+
+  <rect x="470" y="52" width="180" height="46" rx="8" fill="#ffe0e0" stroke="#ef4444"/>
+  <text x="560" y="80" text-anchor="middle" font-size="15" fill="#1e293b">Internet / Users</text>
+  <line x1="560" y1="98" x2="560" y2="130" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <rect x="490" y="130" width="140" height="46" rx="8" fill="#ffe9cc" stroke="#f59e0b"/>
+  <text x="560" y="158" text-anchor="middle" font-size="15" fill="#1e293b">Internet Gateway</text>
+
+  <rect x="40" y="195" width="860" height="545" rx="12" fill="#eef9f0" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="58" y="220" font-size="18" font-weight="600" fill="#15803d">VPC  10.0.0.0/16</text>
+  <text x="200" y="248" font-size="14" font-weight="600" fill="#2563eb">AZ us-east-1a</text>
+  <text x="650" y="248" font-size="14" font-weight="600" fill="#2563eb">AZ us-east-1b</text>
+
+  <rect x="70" y="262" width="800" height="100" rx="10" fill="#fff4e6" stroke="#f59e0b" stroke-dasharray="4 3"/>
+  <text x="86" y="282" font-size="13" fill="#9a5030">Public Subnets — 10.0.1.0/24 (a)  |  10.0.2.0/24 (b)</text>
+  <rect x="100" y="296" width="140" height="52" rx="8" fill="#ffe9cc" stroke="#f59e0b"/>
+  <text x="170" y="327" text-anchor="middle" font-size="14" fill="#1e293b">NAT GW (1a)</text>
+  <rect x="330" y="296" width="200" height="52" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="430" y="327" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">ALB  +  WAF v2</text>
+  <rect x="620" y="296" width="140" height="52" rx="8" fill="#ffe9cc" stroke="#f59e0b"/>
+  <text x="690" y="327" text-anchor="middle" font-size="14" fill="#1e293b">NAT GW (1b)</text>
+  <line x1="555" y1="176" x2="445" y2="296" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+
+  <rect x="70" y="382" width="800" height="100" rx="10" fill="#e7eeff" stroke="#4a9eed" stroke-dasharray="4 3"/>
+  <text x="86" y="402" font-size="13" fill="#2563eb">Private-App Subnets — 10.0.10.0/24 (a)  |  10.0.11.0/24 (b)</text>
+  <rect x="110" y="416" width="270" height="52" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="245" y="447" text-anchor="middle" font-size="14" fill="#1e293b">EKS Nodes (1a) t3.medium</text>
+  <rect x="560" y="416" width="270" height="52" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="695" y="447" text-anchor="middle" font-size="14" fill="#1e293b">EKS Nodes (1b) t3.medium</text>
+  <line x1="415" y1="348" x2="270" y2="416" stroke="#4a9eed" stroke-width="2" marker-end="url(#ab)"/>
+  <line x1="470" y1="348" x2="690" y2="416" stroke="#4a9eed" stroke-width="2" marker-end="url(#ab)"/>
+  <line x1="190" y1="416" x2="178" y2="350" stroke="#f59e0b" stroke-width="2" marker-end="url(#ao)"/>
+  <text x="118" y="392" font-size="12" fill="#9a5030">egress</text>
+
+  <rect x="70" y="502" width="800" height="100" rx="10" fill="#e3fbf3" stroke="#06b6d4" stroke-dasharray="4 3"/>
+  <text x="86" y="522" font-size="13" fill="#0e7490">Private-Data Subnets — 10.0.20.0/24 (a)  |  10.0.21.0/24 (b)</text>
+  <rect x="110" y="536" width="270" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="245" y="567" text-anchor="middle" font-size="14" fill="#1e293b">RDS PostgreSQL primary (1a)</text>
+  <rect x="560" y="536" width="270" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="695" y="567" text-anchor="middle" font-size="14" fill="#1e293b">RDS standby (1b) Multi-AZ</text>
+  <line x1="245" y1="468" x2="245" y2="536" stroke="#06b6d4" stroke-width="2" marker-end="url(#ac)"/>
+  <text x="255" y="508" font-size="12" fill="#0e7490">5432 SSL</text>
+  <line x1="380" y1="562" x2="560" y2="562" stroke="#06b6d4" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ac)"/>
+  <text x="430" y="554" font-size="12" fill="#0e7490">sync repl</text>
+
+  <rect x="918" y="296" width="216" height="66" rx="10" fill="#ece3ff" stroke="#8b5cf6"/>
+  <text x="1026" y="322" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">VPC Endpoints</text>
+  <text x="1026" y="342" text-anchor="middle" font-size="12" fill="#475569">S3/DDB (gw), SM/ECR (interface)</text>
+  <line x1="830" y1="442" x2="930" y2="362" stroke="#8b5cf6" stroke-width="2" marker-end="url(#ap)"/>
+  <text x="845" y="408" font-size="12" fill="#7c3aed">HTTPS</text>
+
+  <rect x="944" y="398" width="180" height="42" rx="8" fill="#fbe2f5" stroke="#ec4899"/>
+  <text x="1034" y="424" text-anchor="middle" font-size="14" fill="#1e293b">DynamoDB</text>
+  <rect x="944" y="450" width="180" height="42" rx="8" fill="#fbe2f5" stroke="#ec4899"/>
+  <text x="1034" y="476" text-anchor="middle" font-size="14" fill="#1e293b">SQS</text>
+  <rect x="944" y="502" width="180" height="42" rx="8" fill="#fbe2f5" stroke="#ec4899"/>
+  <text x="1034" y="528" text-anchor="middle" font-size="14" fill="#1e293b">SES</text>
+  <rect x="944" y="554" width="180" height="42" rx="8" fill="#fbe2f5" stroke="#ec4899"/>
+  <text x="1034" y="580" text-anchor="middle" font-size="14" fill="#1e293b">Secrets Manager</text>
+  <rect x="944" y="606" width="180" height="42" rx="8" fill="#fbe2f5" stroke="#ec4899"/>
+  <text x="1034" y="632" text-anchor="middle" font-size="14" fill="#1e293b">S3  +  ECR</text>
+  <line x1="1026" y1="362" x2="1030" y2="398" stroke="#8b5cf6" stroke-width="2" marker-end="url(#ap)"/>
+</svg>

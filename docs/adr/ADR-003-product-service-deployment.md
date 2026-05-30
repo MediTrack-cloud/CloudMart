@@ -39,7 +39,7 @@ Canary steps (defined in `k8s/argo-rollouts/product-service-rollout.yaml`):
 4. Pause 1 minute — final check
 5. Promote to **100%** — old version is scaled down
 
-The AnalysisTemplate queries CloudWatch for `HTTPCode_Target_5XX_Count / RequestCount`. If the success rate drops below 95% during any step, the rollout is automatically aborted and the canary is rolled back.
+The AnalysisTemplate queries CloudWatch for `HTTPCode_Target_5XX_Count / RequestCount`. If the success rate drops below 99% (i.e. error rate exceeds 1%) during any step, the rollout is automatically aborted and the canary is rolled back.
 
 Rationale:
 - **Low blast radius**: only 20% of users see the new version initially — a bug affects 1 in 5 requests, not all

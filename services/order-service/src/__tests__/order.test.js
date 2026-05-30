@@ -103,7 +103,7 @@ describe('Order Service', () => {
         ],
       });
       expect(res.status).toBe(201);
-      expect(res.body.total).toBeCloseTo(25.00, 2);
+      expect(res.body.total).toBeCloseTo(30.00, 2); // mock returns price:10 for every product
     });
   });
 

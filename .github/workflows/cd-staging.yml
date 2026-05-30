@@ -34,10 +34,11 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
-      - name: Substitute AWS Account ID in manifests
+      - name: Substitute AWS Account ID and region in manifests
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          find k8s/ -type f -name "*.yaml" -exec sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g" {} +
+          find k8s -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' \
+            -exec sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g; s/__REGION__/${{ env.AWS_REGION }}/g; s/__DEMO_RECIPIENT__/${{ vars.DEMO_RECIPIENT_EMAIL }}/g" {} +
 
       - name: Update image tags in kustomize overlay
         run: |

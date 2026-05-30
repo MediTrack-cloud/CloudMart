@@ -13,16 +13,15 @@ RUN npm run build
 # ---- Stage 2: Serve with Nginx ----
 FROM nginx:1.27-alpine
 
-# Remove default nginx config
+# Upgrade openssl/libcrypto to >=3.3.7-r0 to fix CVE-2026-31789 (CRITICAL)
+RUN apk upgrade --no-cache libcrypto3 libssl3
+
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built React app
 COPY --from=builder /build/build /usr/share/nginx/html
 
-# Run as non-root user
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \

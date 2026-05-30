@@ -63,9 +63,9 @@ resource "aws_iam_role_policy" "product_dynamodb" {
         ]
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = [var.app_kms_key_arn]
       }
     ]
@@ -83,15 +83,15 @@ resource "aws_iam_role_policy" "order_sqs" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SQSSend"
-        Effect = "Allow"
-        Action = ["sqs:SendMessage", "sqs:GetQueueAttributes", "sqs:GetQueueUrl"]
+        Sid      = "SQSSend"
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage", "sqs:GetQueueAttributes", "sqs:GetQueueUrl"]
         Resource = [var.sqs_queue_arn]
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = [var.app_kms_key_arn]
       }
     ]
@@ -132,9 +132,9 @@ resource "aws_iam_role_policy" "notification_sqs_ses" {
         }
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = [var.app_kms_key_arn]
       }
     ]
@@ -158,9 +158,9 @@ resource "aws_iam_role_policy" "user_secrets" {
         Resource = [var.rds_secret_arn]
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
         Resource = [var.app_kms_key_arn]
       }
     ]
@@ -175,8 +175,8 @@ resource "aws_iam_role" "external_secrets" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {
@@ -205,8 +205,8 @@ resource "aws_iam_role_policy" "external_secrets" {
         Resource = ["arn:aws:secretsmanager:${var.aws_region}:${var.account_id}:secret:cloudmart/*"]
       },
       {
-        Effect = "Allow"
-        Action = ["kms:Decrypt"]
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
         Resource = compact([var.app_kms_key_arn, var.rds_kms_key_arn])
       }
     ]
@@ -221,8 +221,8 @@ resource "aws_iam_role" "lb_controller" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {
@@ -252,8 +252,8 @@ resource "aws_iam_role" "cluster_autoscaler" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {
@@ -332,9 +332,9 @@ resource "aws_iam_role_policy" "github_actions" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "ECRAuth"
-        Effect = "Allow"
-        Action = ["ecr:GetAuthorizationToken"]
+        Sid      = "ECRAuth"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
         Resource = ["*"]
       },
       {
@@ -372,8 +372,8 @@ resource "aws_iam_role" "velero" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {
@@ -426,8 +426,8 @@ resource "aws_iam_role" "xray" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {
@@ -452,8 +452,8 @@ resource "aws_iam_role" "keda_operator" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
       Principal = { Federated = var.oidc_provider_arn }
       Condition = {
         StringEquals = {

@@ -3,10 +3,15 @@
 
 global:
   awsRegion: us-east-1
-  # Set this to your ECR registry prefix before deploying:
-  # e.g.  123456789012.dkr.ecr.us-east-1.amazonaws.com/cloudmart
-  imageRegistry: "898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart"
-  imageTag: "latest"
+  # Your 12-digit AWS account ID. The image registry is derived as
+  # <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/cloudmart unless you set
+  # imageRegistry explicitly below. Provide via: --set global.awsAccountId=...
+  awsAccountId: ""
+  # Optional explicit override of the full ECR registry prefix:
+  imageRegistry: ""
+  # Image tag — defaults to the chart appVersion (1.0.0); override per-deploy
+  # (e.g. --set global.imageTag=<git-sha>). Never :latest.
+  imageTag: ""
   environment: prod
   namespace: cloudmart-prod
 

@@ -44,19 +44,29 @@ while getopts "e:" opt; do
 done
 [[ "$ENV" == "staging" || "$ENV" == "prod" ]] || die "Environment must be 'staging' or 'prod'."
 
-# ── 2  AWS identity ──────────────────────────────────────────────────────────
-EXPECTED_ACCOUNT_ID="898865655202"
+# ── 2  AWS identity (resolved dynamically — nothing hardcoded) ───────────────
 log "Verifying AWS credentials …"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null) \
   || die "Not authenticated. Check AWS_PROFILE ($AWS_PROFILE) or run 'aws configure'."
-[[ "$ACCOUNT_ID" == "$EXPECTED_ACCOUNT_ID" ]] \
-  || die "Account mismatch: resolved $ACCOUNT_ID but expected $EXPECTED_ACCOUNT_ID. Check AWS_PROFILE in .env"
+# Optional guard: set EXPECTED_ACCOUNT_ID in .env to prevent deploying to the wrong
+# account. Unset = deploy to whichever account the credentials resolve to.
+if [[ -n "${EXPECTED_ACCOUNT_ID:-}" && "$ACCOUNT_ID" != "$EXPECTED_ACCOUNT_ID" ]]; then
+  die "Account mismatch: resolved $ACCOUNT_ID but EXPECTED_ACCOUNT_ID=$EXPECTED_ACCOUNT_ID."
+fi
 AWS_REGION="${AWS_REGION:-us-east-1}"
 log "Account $ACCOUNT_ID  |  Region $AWS_REGION  |  Env $ENV"
 
 NAMESPACE="cloudmart-$ENV"
 CLUSTER="cloudmart-$ENV"
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"     # Always resolve to repo root
+
+# Non-destructive build: placeholder substitution and Terraform-output injection
+# happen on a throwaway COPY of k8s/, so the tracked source files are never
+# mutated (they stay as ACCOUNT_ID / __REGION__ placeholders in git).
+K8S_DIR="$(mktemp -d)/k8s"
+cp -R "$ROOT_DIR/k8s" "$K8S_DIR"
+trap 'rm -rf "$(dirname "$K8S_DIR")"' EXIT
+log "Rendering manifests into throwaway build dir: $K8S_DIR"
 
 # ── Export Terraform variables from .env ────────────────────────────────────
 [[ -n "${GITHUB_ORG:-}" ]] || die "GITHUB_ORG is required. Set it in .env (see .env.example)."
@@ -67,13 +77,17 @@ export TF_VAR_alert_email="${ALERT_EMAIL:-}"
 export TF_VAR_ses_from_email="${SES_FROM_EMAIL:-}"
 export TF_VAR_monthly_budget_usd="${MONTHLY_BUDGET_USD:-30}"
 export TF_VAR_owner_email="${OWNER_EMAIL:-team@cloudmart.example}"
+# SES sandbox: route demo order emails to your verified address (defaults to the sender).
+export DEMO_RECIPIENT_EMAIL="${DEMO_RECIPIENT_EMAIL:-${SES_FROM_EMAIL:-}}"
 
-# ── 3  Substitute ACCOUNT_ID in every k8s YAML ──────────────────────────────
-log "Replacing ACCOUNT_ID placeholders in k8s/ manifests …"
-find "$ROOT_DIR/k8s" -type f -name '*.yaml' -exec \
-  grep -l 'ACCOUNT_ID' {} + 2>/dev/null | while read -r f; do
-    sedi "s/ACCOUNT_ID/$ACCOUNT_ID/g" "$f"
-  done || true
+# ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
+# (k8s/helm/* is excluded — Helm renders the registry from its own values.)
+log "Substituting ACCOUNT_ID=$ACCOUNT_ID and region=$AWS_REGION in k8s/ manifests …"
+find "$K8S_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
+  sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" "$f"
+done
+# Inject demo email recipient (SES sandbox sends only to verified addresses).
+sedi "s|__DEMO_RECIPIENT__|${DEMO_RECIPIENT_EMAIL}|g" "$K8S_DIR/base/configmap.yaml"
 log "Placeholder substitution complete."
 
 # ── 4  Bootstrap — Terraform remote state ────────────────────────────────────
@@ -115,7 +129,7 @@ VPC_ID=$(aws ec2 describe-vpcs --region "$AWS_REGION" \
 cd "$ROOT_DIR"
 
 # ── 6  Patch Ingress: ensure an ACM cert exists and inject it for HTTPS ──────
-INGRESS_FILE="$ROOT_DIR/k8s/base/frontend/ingress.yaml"
+INGRESS_FILE="$K8S_DIR/base/frontend/ingress.yaml"
 SELF_SIGNED_CERT_NAME="cloudmart-selfsigned-$ENV"
 if [[ -z "${ACM_CERT_ARN:-}" ]]; then
   # Reuse a previously-imported self-signed cert if present (tag-matched)
@@ -134,7 +148,7 @@ if [[ -z "${ACM_CERT_ARN:-}" ]]; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
       -keyout "$CERT_DIR/tls.key" -out "$CERT_DIR/tls.crt" \
       -subj "/CN=cloudmart-demo/O=CloudMart/C=US" \
-      -addext "subjectAltName=DNS:*.us-east-1.elb.amazonaws.com,DNS:*.elb.amazonaws.com,DNS:cloudmart-demo,DNS:localhost" \
+      -addext "subjectAltName=DNS:*.$AWS_REGION.elb.amazonaws.com,DNS:*.elb.amazonaws.com,DNS:cloudmart-demo,DNS:localhost" \
       >/dev/null 2>&1
     ACM_CERT_ARN=$(aws acm import-certificate --region "$AWS_REGION" \
       --certificate "fileb://$CERT_DIR/tls.crt" \
@@ -150,10 +164,10 @@ else
   log "Using user-provided ACM_CERT_ARN for HTTPS."
 fi
 log "Injecting ACM certificate ARN into Ingress …"
-sedi "s|arn:aws:acm:us-east-1:.*:certificate/CERT_ID|$ACM_CERT_ARN|g" "$INGRESS_FILE"
+sedi "s|arn:aws:acm:[^:]*:[^:]*:certificate/CERT_ID|$ACM_CERT_ARN|g" "$INGRESS_FILE"
 
 # Inject real WAF ARN
-sedi "s|arn:aws:wafv2:us-east-1:.*:regional/webacl/cloudmart-waf-ENV/WAF_ID|$WAF_ARN|g" "$INGRESS_FILE"
+sedi "s|arn:aws:wafv2:[^:]*:[^:]*:regional/webacl/cloudmart-waf-ENV/WAF_ID|$WAF_ARN|g" "$INGRESS_FILE"
 # Remove host matching so the ALB responds on any hostname
 sedi "s|host: cloudmart.example|# host: (removed — using ALB DNS)|" "$INGRESS_FILE"
 sedi '/external-dns.alpha.kubernetes.io/d' "$INGRESS_FILE"
@@ -161,30 +175,30 @@ sedi '/external-dns.alpha.kubernetes.io/d' "$INGRESS_FILE"
 # ── 7  Inject dynamic role ARNs into Helm values & manifests ─────────────────
 log "Injecting Terraform‐generated role ARNs into Helm value files …"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-lb-controller-role-.*|$LB_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/aws-load-balancer-controller.yaml"
+  "$K8S_DIR/helm-values/aws-load-balancer-controller.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-cluster-autoscaler-role-.*|$AS_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/cluster-autoscaler.yaml"
+  "$K8S_DIR/helm-values/cluster-autoscaler.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-external-secrets-role-.*|$ES_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/helm-values/external-secrets.yaml"
+  "$K8S_DIR/helm-values/external-secrets.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-velero-role-.*|$VELERO_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/velero/velero-values.yaml"
+  "$K8S_DIR/velero/velero-values.yaml"
 sedi "s|arn:aws:iam::$ACCOUNT_ID:role/cloudmart-xray-role-.*|$XRAY_ROLE_ARN|" \
-  "$ROOT_DIR/k8s/xray/xray-daemon-daemonset.yaml"
+  "$K8S_DIR/xray/xray-daemon-daemonset.yaml"
 
 # Patch cluster name in Helm value files for current environment
 sedi "s/clusterName: cloudmart-.*/clusterName: $CLUSTER_NAME/" \
-  "$ROOT_DIR/k8s/helm-values/aws-load-balancer-controller.yaml"
+  "$K8S_DIR/helm-values/aws-load-balancer-controller.yaml"
 
 # Patch velero bucket name
 sedi "s|cloudmart-velero-.*$ACCOUNT_ID|cloudmart-velero-$ACCOUNT_ID|" \
-  "$ROOT_DIR/k8s/velero/velero-values.yaml"
+  "$K8S_DIR/velero/velero-values.yaml"
 
 # Patch KEDA SQS URL
-KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject-staging.yaml"
+KEDA_FILE="$K8S_DIR/keda/notification-service-scaledobject-staging.yaml"
 if [[ "$ENV" == "prod" ]]; then
-  KEDA_FILE="$ROOT_DIR/k8s/keda/notification-service-scaledobject.yaml"
+  KEDA_FILE="$K8S_DIR/keda/notification-service-scaledobject.yaml"
 fi
-sedi "s|https://sqs.us-east-1.amazonaws.com/.*|$SQS_URL\"|" "$KEDA_FILE"
+sedi "s|https://sqs\.[^.]*\.amazonaws\.com/.*|$SQS_URL\"|" "$KEDA_FILE"
 
 # ── 8  Connect kubectl ───────────────────────────────────────────────────────
 log "Connecting kubectl to EKS cluster $CLUSTER_NAME …"
@@ -215,7 +229,7 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
 
 helm upgrade --install metrics-server metrics-server/metrics-server \
   -n kube-system --wait \
-  -f "$ROOT_DIR/k8s/helm-values/metrics-server.yaml"
+  -f "$K8S_DIR/helm-values/metrics-server.yaml"
 
 helm upgrade --install external-secrets external-secrets/external-secrets \
   -n external-secrets --create-namespace --wait \
@@ -225,7 +239,7 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
 
 helm upgrade --install keda kedacore/keda \
   -n keda --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/keda.yaml"
+  -f "$K8S_DIR/helm-values/keda.yaml"
 
 # Annotate KEDA operator SA with IRSA role for SQS queue-depth polling
 kubectl annotate serviceaccount keda-operator -n keda \
@@ -234,31 +248,33 @@ kubectl rollout restart deployment/keda-operator -n keda
 
 helm upgrade --install kyverno kyverno/kyverno \
   -n kyverno --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/kyverno.yaml"
+  -f "$K8S_DIR/helm-values/kyverno.yaml"
 
 helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   -n kube-system --wait \
   --set "autoDiscovery.clusterName=$CLUSTER_NAME" \
   --set "awsRegion=$AWS_REGION" \
+  --set "rbac.serviceAccount.create=true" \
+  --set "rbac.serviceAccount.name=cluster-autoscaler" \
   --set "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$AS_ROLE_ARN"
 
 helm upgrade --install argo-rollouts argo/argo-rollouts \
   -n argo-rollouts --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/helm-values/argo-rollouts.yaml"
+  -f "$K8S_DIR/helm-values/argo-rollouts.yaml"
 
 helm upgrade --install velero vmware-tanzu/velero \
   -n velero --create-namespace --wait \
-  -f "$ROOT_DIR/k8s/velero/velero-values.yaml" || warn "Velero install skipped (non-fatal)."
+  -f "$K8S_DIR/velero/velero-values.yaml" || warn "Velero install skipped (non-fatal)."
 
 # ── 10  Apply Kubernetes manifests ───────────────────────────────────────────
 log "Applying Kyverno cluster policies …"
-kubectl apply -f "$ROOT_DIR/k8s/security/"
+kubectl apply -f "$K8S_DIR/security/"
 
 log "Applying X-Ray daemon …"
-kubectl apply -f "$ROOT_DIR/k8s/xray/"
+kubectl apply -f "$K8S_DIR/xray/"
 
 log "Applying Kustomize overlay ($ENV) …"
-kubectl apply -k "$ROOT_DIR/k8s/overlays/$ENV"
+kustomize build --load-restrictor LoadRestrictionsNone "$K8S_DIR/overlays/$ENV" | kubectl apply -f -
 
 log "Applying KEDA ScaledObject …"
 kubectl apply -f "$KEDA_FILE"
@@ -269,13 +285,31 @@ aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS \
     --password-stdin "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-log "Building and pushing 5 microservice images …"
+# Immutable tag — defaults to the pinned release the manifests reference (v1.0.0).
+# Override with IMAGE_TAG=<git-sha> to push a specific build; never uses :latest.
+IMAGE_TAG="${IMAGE_TAG:-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo 1.0.0)}"
+log "Building and pushing 5 microservice images (tag: $IMAGE_TAG) …"
 for SVC in product-service order-service user-service notification-service frontend; do
-  IMG="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart/$SVC:latest"
+  IMG="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart/$SVC:$IMAGE_TAG"
   log "  → $SVC"
   docker build -q --platform linux/amd64 -t "$IMG" "$ROOT_DIR/services/$SVC"
-  docker push "$IMG"
+  # Retry the push — ECR pushes occasionally hit transient TLS handshake timeouts.
+  pushed=false
+  for attempt in 1 2 3 4 5; do
+    if docker push "$IMG"; then pushed=true; break; fi
+    warn "  push of $SVC failed (attempt $attempt/5) — retrying in 8s …"; sleep 8
+  done
+  [[ "$pushed" == true ]] || die "Failed to push $SVC after 5 attempts."
 done
+
+# Pin the running workloads to the immutable tag just pushed.
+log "Pinning overlay images to tag $IMAGE_TAG …"
+ECR="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart"
+( cd "$K8S_DIR/overlays/$ENV" && \
+  for SVC in product-service order-service user-service notification-service frontend; do
+    kustomize edit set image "$ECR/$SVC=$ECR/$SVC:$IMAGE_TAG" 2>/dev/null || true
+  done )
+kustomize build --load-restrictor LoadRestrictionsNone "$K8S_DIR/overlays/$ENV" | kubectl apply -f -
 
 # ── 12  Restart deployments ──────────────────────────────────────────────────
 log "Rolling restart to pick up new images …"

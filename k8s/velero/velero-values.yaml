@@ -5,14 +5,14 @@ configuration:
   backupStorageLocation:
     - name: default
       provider: aws
-      bucket: cloudmart-velero-898865655202
+      bucket: cloudmart-velero-ACCOUNT_ID
       config:
-        region: us-east-1
+        region: __REGION__
   volumeSnapshotLocation:
     - name: default
       provider: aws
       config:
-        region: us-east-1
+        region: __REGION__
 
 initContainers:
   - name: velero-plugin-for-aws
@@ -25,8 +25,7 @@ initContainers:
 serviceAccount:
   server:
     annotations:
-      # Replace 898865655202 and ROLE_ID with values from Terraform output
-      eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-velero-role-staging
+      eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-velero-role-staging
 
 credentials:
   useSecret: false   # use IRSA — no static credentials in cluster

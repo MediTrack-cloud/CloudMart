@@ -22,7 +22,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: product-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/product-service:latest
+          image: ACCOUNT_ID.dkr.ecr.__REGION__.amazonaws.com/cloudmart/product-service:1.0.0
           ports:
             - containerPort: 8001
           env:
@@ -105,7 +105,7 @@ spec:
     - name: success-rate
       interval: 30s
       count: 3
-      successCondition: result[0] >= 0.95
+      successCondition: result[0] >= 0.99
       failureLimit: 1
       provider:
         cloudWatch:

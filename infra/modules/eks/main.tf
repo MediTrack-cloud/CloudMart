@@ -106,7 +106,7 @@ resource "aws_launch_template" "nodes" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"    # IMDSv2 mandatory
+    http_tokens                 = "required" # IMDSv2 mandatory
     http_put_response_hop_limit = 1
   }
 
@@ -191,8 +191,46 @@ resource "aws_eks_addon" "ebs_csi" {
 resource "aws_eks_addon" "cloudwatch_observability" {
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = "amazon-cloudwatch-observability"
+  service_account_role_arn    = aws_iam_role.cloudwatch_observability.arn
   resolve_conflicts_on_create = "OVERWRITE"
   depends_on                  = [aws_eks_node_group.main]
+}
+
+# ---------------------------------------------------------------------------
+# CloudWatch Observability (Application Signals) IAM role
+# The cloudwatch-agent acts as the OTLP receiver and forwards traces to X-Ray,
+# so its service account needs CloudWatchAgentServerPolicy (which includes
+# xray:PutTraceSegments). Without this the agent falls back to the node role
+# and X-Ray export fails with AccessDeniedException / 403.
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "cloudwatch_observability_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:amazon-cloudwatch:cloudwatch-agent"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "cloudwatch_observability" {
+  name               = "cloudmart-cloudwatch-observability-role-${var.environment}"
+  assume_role_policy = data.aws_iam_policy_document.cloudwatch_observability_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_observability" {
+  role       = aws_iam_role.cloudwatch_observability.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
 # ---------------------------------------------------------------------------

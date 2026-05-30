@@ -3,7 +3,6 @@ Unit tests for product-service using the in-memory store backend.
 Run: pytest tests/ -v
 """
 import pytest
-import json
 import sys
 import os
 
@@ -12,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Force in-memory backend for tests
 os.environ["STORE_BACKEND"] = "memory"
 
-from app import app as flask_app
+from app import app as flask_app  # noqa: E402
 
 
 @pytest.fixture

@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 os.environ["DB_BACKEND"] = "memory"
 os.environ["JWT_SECRET"] = "test-secret"
 
-from app import app as flask_app
+from app import app as flask_app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -55,13 +55,13 @@ def test_register_user(client):
     })
     assert resp.status_code == 201
     data = resp.get_json()
-    assert data["email"] == "test@example.com"
+    assert data["user"]["email"] == "test@example.com"
     assert "token" in data
-    assert "password" not in data
+    assert "passwordHash" not in data["user"]
 
 
 def test_register_duplicate_email_returns_409(client):
-    payload = {"email": "dup@example.com", "password": "Pass1!", "name": "User"}
+    payload = {"email": "dup@example.com", "password": "Password1!", "name": "User"}
     client.post("/auth/register", json=payload)
     resp = client.post("/auth/register", json=payload)
     assert resp.status_code == 409

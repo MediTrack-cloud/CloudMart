@@ -50,28 +50,28 @@ patches:
   - patch: |
       - op: replace
         path: /metadata/annotations/eks.amazonaws.com~1role-arn
-        value: arn:aws:iam::898865655202:role/cloudmart-product-service-role-staging
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-product-service-role-staging
     target:
       kind: ServiceAccount
       name: product-service-sa
   - patch: |
       - op: replace
         path: /metadata/annotations/eks.amazonaws.com~1role-arn
-        value: arn:aws:iam::898865655202:role/cloudmart-order-service-role-staging
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-order-service-role-staging
     target:
       kind: ServiceAccount
       name: order-service-sa
   - patch: |
       - op: replace
         path: /metadata/annotations/eks.amazonaws.com~1role-arn
-        value: arn:aws:iam::898865655202:role/cloudmart-user-service-role-staging
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-user-service-role-staging
     target:
       kind: ServiceAccount
       name: user-service-sa
   - patch: |
       - op: replace
         path: /metadata/annotations/eks.amazonaws.com~1role-arn
-        value: arn:aws:iam::898865655202:role/cloudmart-notification-service-role-staging
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-notification-service-role-staging
     target:
       kind: ServiceAccount
       name: notification-service-sa

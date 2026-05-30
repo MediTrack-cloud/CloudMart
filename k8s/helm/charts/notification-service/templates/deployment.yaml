@@ -1,7 +1,7 @@
 {{- $global := .Values.global | default dict }}
 {{- $env := $global.environment | default "prod" }}
 {{- $ns  := $global.namespace   | default (printf "cloudmart-%s" $env) }}
-{{- $reg := $global.imageRegistry | default "898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart" }}
+{{- $reg := $global.imageRegistry | default (printf "%s.dkr.ecr.%s.amazonaws.com/cloudmart" ($global.awsAccountId | default "") ($global.awsRegion | default "us-east-1")) }}
 {{- $tag := $global.imageTag     | default .Chart.AppVersion }}
 apiVersion: apps/v1
 kind: Deployment

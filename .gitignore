@@ -1,0 +1,26 @@
+# Secrets & local env
+.env
+.env.local
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# OS / editor
+.DS_Store
+*.swp
+*~

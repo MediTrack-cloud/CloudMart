@@ -41,7 +41,7 @@ resource "aws_s3_bucket" "dr_static" {
 resource "aws_s3_bucket_website_configuration" "dr_static" {
   bucket = aws_s3_bucket.dr_static.id
   index_document { suffix = "index.html" }
-  error_document { key    = "index.html" }
+  error_document { key = "index.html" }
 }
 
 resource "aws_s3_bucket_public_access_block" "dr_static" {

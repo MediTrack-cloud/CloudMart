@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ad" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#334155"/></marker>
+    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#22c55e"/></marker>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#ef4444"/></marker>
+  </defs>
+  <rect width="1180" height="640" fill="#ffffff"/>
+  <text x="590" y="32" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">D4 — CloudMart CI/CD Pipeline (GitHub Actions)</text>
+
+  <text x="40" y="78" font-size="16" font-weight="600" fill="#2563eb">CI — runs on every push (ci.yml)</text>
+  <rect x="40" y="92" width="125" height="62" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="102" y="128" text-anchor="middle" font-size="13" fill="#1e293b">Developer push</text>
+  <rect x="185" y="92" width="140" height="62" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="255" y="120" text-anchor="middle" font-size="13" fill="#1e293b">Lint + Unit</text>
+  <text x="255" y="138" text-anchor="middle" font-size="13" fill="#1e293b">tests</text>
+  <rect x="345" y="92" width="120" height="62" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="405" y="128" text-anchor="middle" font-size="13" fill="#1e293b">Docker build</text>
+  <rect x="485" y="92" width="160" height="62" rx="8" fill="#ffe0e0" stroke="#ef4444"/>
+  <text x="565" y="120" text-anchor="middle" font-size="13" fill="#1e293b">Trivy scan</text>
+  <text x="565" y="138" text-anchor="middle" font-size="13" fill="#1e293b">CRITICAL = fail</text>
+  <rect x="665" y="92" width="135" height="62" rx="8" fill="#d7f7dd" stroke="#22c55e"/>
+  <text x="732" y="128" text-anchor="middle" font-size="13" fill="#1e293b">Push ECR :SHA</text>
+  <rect x="820" y="92" width="150" height="62" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="895" y="120" text-anchor="middle" font-size="13" fill="#1e293b">kubeconform</text>
+  <text x="895" y="138" text-anchor="middle" font-size="13" fill="#1e293b">validate</text>
+  <line x1="165" y1="123" x2="185" y2="123" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="325" y1="123" x2="345" y2="123" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="465" y1="123" x2="485" y2="123" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="645" y1="123" x2="665" y2="123" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="800" y1="123" x2="820" y2="123" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+
+  <polygon points="505,210 605,250 505,290 405,250" fill="#ece3ff" stroke="#8b5cf6"/>
+  <text x="505" y="255" text-anchor="middle" font-size="14" fill="#1e293b">branch ref?</text>
+  <line x1="505" y1="154" x2="505" y2="210" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+
+  <text x="120" y="335" font-size="15" font-weight="600" fill="#2563eb">CD staging (cd-staging.yml) — merge to develop</text>
+  <rect x="120" y="352" width="200" height="58" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="220" y="386" text-anchor="middle" font-size="13" fill="#1e293b">Deploy cloudmart-staging</text>
+  <rect x="350" y="352" width="180" height="58" rx="8" fill="#d7f7dd" stroke="#22c55e"/>
+  <text x="440" y="386" text-anchor="middle" font-size="13" fill="#1e293b">Smoke test (readiness)</text>
+  <line x1="320" y1="381" x2="350" y2="381" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="430" y1="285" x2="225" y2="352" stroke="#22c55e" stroke-width="2" marker-end="url(#ag)"/>
+  <text x="300" y="318" font-size="13" fill="#15803d">develop</text>
+
+  <text x="120" y="452" font-size="15" font-weight="600" fill="#b91c1c">CD production (cd-prod.yml) — merge to main</text>
+  <rect x="120" y="468" width="150" height="62" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="195" y="496" text-anchor="middle" font-size="13" fill="#1e293b">Manual approval</text>
+  <text x="195" y="514" text-anchor="middle" font-size="13" fill="#1e293b">gate</text>
+  <rect x="300" y="468" width="140" height="62" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="370" y="503" text-anchor="middle" font-size="13" fill="#1e293b">Velero backup</text>
+  <rect x="470" y="464" width="240" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="590" y="492" text-anchor="middle" font-size="13" fill="#1e293b">Deploy prod: Argo canary</text>
+  <text x="590" y="512" text-anchor="middle" font-size="13" fill="#1e293b">20-&gt;40-&gt;100 (halt if err &gt; 1%)</text>
+  <rect x="740" y="468" width="130" height="62" rx="8" fill="#d7f7dd" stroke="#22c55e"/>
+  <text x="805" y="503" text-anchor="middle" font-size="13" fill="#1e293b">Smoke test</text>
+  <rect x="900" y="468" width="150" height="62" rx="8" fill="#ffe0e0" stroke="#ef4444"/>
+  <text x="975" y="496" text-anchor="middle" font-size="13" fill="#1e293b">Rollback on</text>
+  <text x="975" y="514" text-anchor="middle" font-size="13" fill="#1e293b">failure</text>
+  <line x1="270" y1="499" x2="300" y2="499" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="440" y1="499" x2="470" y2="499" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="710" y1="499" x2="740" y2="499" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <line x1="870" y1="499" x2="900" y2="499" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#ar)"/>
+  <text x="872" y="491" font-size="11" fill="#b91c1c">on fail</text>
+  <line x1="555" y1="290" x2="350" y2="468" stroke="#ef4444" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="430" y="400" font-size="13" fill="#b91c1c">main</text>
+</svg>

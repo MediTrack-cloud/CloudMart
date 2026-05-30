@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws    = { source = "hashicorp/aws", version = "~> 5.0" }
     random = { source = "hashicorp/random", version = "~> 3.6" }
-    tls    = { source = "hashicorp/tls",    version = "~> 4.0" }
+    tls    = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -28,10 +28,11 @@ module "kms" {
 }
 
 module "vpc" {
-  source             = "../../modules/vpc"
-  environment        = var.environment
-  aws_region         = var.aws_region
-  single_nat_gateway = var.single_nat_gateway
+  source                = "../../modules/vpc"
+  environment           = var.environment
+  aws_region            = var.aws_region
+  single_nat_gateway    = var.single_nat_gateway
+  bastion_allowed_cidrs = var.bastion_allowed_cidrs
 }
 
 module "eks" {
@@ -86,8 +87,11 @@ module "iam" {
   sqs_queue_arn      = module.sqs.queue_arn
   rds_secret_arn     = module.rds.secret_arn
   app_kms_key_arn    = module.kms.app_key_arn
+  rds_kms_key_arn    = module.kms.rds_key_arn
   ses_from_email     = var.ses_from_email
-  service_accounts   = {
+  github_org         = var.github_org
+  github_repo        = var.github_repo
+  service_accounts = {
     "product-service"      = { namespace = "cloudmart-${var.environment}", sa_name = "product-service-sa" }
     "order-service"        = { namespace = "cloudmart-${var.environment}", sa_name = "order-service-sa" }
     "notification-service" = { namespace = "cloudmart-${var.environment}", sa_name = "notification-service-sa" }
