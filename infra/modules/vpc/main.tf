@@ -205,7 +205,7 @@ resource "aws_security_group" "rds" {
 # Bastion host — SSH access from the internet (restrict to known IPs in production)
 resource "aws_security_group" "bastion" {
   name        = "cloudmart-bastion-sg-${var.environment}"
-  description = "Bastion: SSH inbound from approved CIDR only; all egress to private subnets"
+  description = "Bastion: SSH inbound from approved CIDR only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -213,7 +213,7 @@ resource "aws_security_group" "bastion" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Lock down to admin CIDR in production; left open for demo
+    cidr_blocks = ["0.0.0.0/0"] # TODO: Lock down to admin CIDR in production; left open for demo
   }
   egress {
     description = "SSH to EKS nodes / RDS in private subnets"
