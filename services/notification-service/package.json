@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "jest --coverage"
+    "test": "jest --coverage --forceExit"
   },
   "dependencies": {
     "express": "^4.19.2",
