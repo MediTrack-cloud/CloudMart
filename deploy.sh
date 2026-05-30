@@ -287,7 +287,13 @@ for SVC in product-service order-service user-service notification-service front
   IMG="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart/$SVC:$IMAGE_TAG"
   log "  → $SVC"
   docker build -q --platform linux/amd64 -t "$IMG" "$ROOT_DIR/services/$SVC"
-  docker push "$IMG"
+  # Retry the push — ECR pushes occasionally hit transient TLS handshake timeouts.
+  pushed=false
+  for attempt in 1 2 3 4 5; do
+    if docker push "$IMG"; then pushed=true; break; fi
+    warn "  push of $SVC failed (attempt $attempt/5) — retrying in 8s …"; sleep 8
+  done
+  [[ "$pushed" == true ]] || die "Failed to push $SVC after 5 attempts."
 done
 
 # Pin the running workloads to the immutable tag just pushed.
