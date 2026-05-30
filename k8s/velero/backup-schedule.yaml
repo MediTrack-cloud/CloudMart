@@ -1,0 +1,19 @@
+# Velero Schedule — daily backup of cloudmart-prod namespace at 02:00 UTC
+# Apply after Velero is installed: kubectl apply -f k8s/velero/backup-schedule.yaml
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: cloudmart-prod-daily
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"
+  template:
+    ttl: 168h0m0s         # 7-day retention
+    includedNamespaces:
+      - cloudmart-prod
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: cloudmart
