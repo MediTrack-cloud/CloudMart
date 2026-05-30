@@ -5,11 +5,3 @@ metadata:
   labels:
     app: cloudmart
     environment: production
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cloudmart-staging
-  labels:
-    app: cloudmart
-    environment: staging
