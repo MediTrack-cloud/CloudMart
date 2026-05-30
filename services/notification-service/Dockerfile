@@ -8,19 +8,15 @@ RUN npm install --omit=dev
 # ---- Stage 2: Runtime ----
 FROM node:20-alpine
 
-# Create non-root user
 RUN addgroup -S appuser && adduser -S appuser -G appuser
 
 WORKDIR /app
 
-# Copy dependencies from builder
 COPY --from=builder /build/node_modules ./node_modules
 COPY --from=builder /build/package.json ./
 
-# Copy application code
 COPY src/ ./src/
 
-# Switch to non-root user
 USER appuser
 
 EXPOSE 8004
