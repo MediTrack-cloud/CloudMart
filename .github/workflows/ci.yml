@@ -138,7 +138,15 @@ jobs:
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 
-      - name: Validate overlays (dry-run kustomize build)
+      - name: Install kustomize
         run: |
-          kubectl kustomize k8s/overlays/staging > /dev/null
-          kubectl kustomize k8s/overlays/prod    > /dev/null
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Validate overlays (dry-run kustomize build)
+        # prod cherry-picks base files (to swap the product Deployment for the
+        # Argo Rollout), so it references files across the overlay root —
+        # LoadRestrictionsNone permits that for a trusted in-repo build.
+        run: |
+          kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/staging > /dev/null
+          kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/prod    > /dev/null

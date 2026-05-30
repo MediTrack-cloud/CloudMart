@@ -260,7 +260,7 @@ log "Applying X-Ray daemon …"
 kubectl apply -f "$ROOT_DIR/k8s/xray/"
 
 log "Applying Kustomize overlay ($ENV) …"
-kubectl apply -k "$ROOT_DIR/k8s/overlays/$ENV"
+kustomize build --load-restrictor LoadRestrictionsNone "$ROOT_DIR/k8s/overlays/$ENV" | kubectl apply -f -
 
 log "Applying KEDA ScaledObject …"
 kubectl apply -f "$KEDA_FILE"
@@ -289,7 +289,7 @@ ECR="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart"
   for SVC in product-service order-service user-service notification-service frontend; do
     kustomize edit set image "$ECR/$SVC=$ECR/$SVC:$IMAGE_TAG" 2>/dev/null || true
   done )
-kubectl apply -k "$ROOT_DIR/k8s/overlays/$ENV"
+kustomize build --load-restrictor LoadRestrictionsNone "$ROOT_DIR/k8s/overlays/$ENV" | kubectl apply -f -
 
 # ── 12  Restart deployments ──────────────────────────────────────────────────
 log "Rolling restart to pick up new images …"
