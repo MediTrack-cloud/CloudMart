@@ -35,13 +35,13 @@ const styles = {
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'box-shadow 0.2s',
   },
   cardTitle: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' },
-  cardPrice: { fontSize: '22px', fontWeight: 'bold', color: '#000', margin: '8px 0' },
+  cardPrice: { fontSize: '22px', fontWeight: 'bold', color: '#00ff00', margin: '8px 0' },
   badge: {
     display: 'inline-block', background: '#e8f5e9', color: '#2e7d32',
     padding: '2px 8px', borderRadius: '12px', fontSize: '12px',
   },
   btn: {
-    background: '#000', color: '#fff', border: 'none',
+    background: '#00ff00', color: '#fff', border: 'none',
     padding: '10px 20px', borderRadius: '4px', cursor: 'pointer',
     fontSize: '14px', fontWeight: '600',
   },
@@ -65,7 +65,7 @@ const styles = {
     background: '#e8f5e9', border: '1px solid #4caf50', color: '#2e7d32',
   },
   cartBadge: {
-    background: '#000', color: '#fff', borderRadius: '50%',
+    background: '#00ff00', color: '#fff', borderRadius: '50%',
     padding: '2px 8px', fontSize: '12px', marginLeft: '4px',
   },
   modal: {
@@ -386,7 +386,7 @@ function CartPage({ cart, removeFromCart, cartTotal, placeOrder, loading }) {
         <tfoot>
           <tr>
             <td colSpan={3} style={{ ...styles.td, fontWeight: 'bold' }}>Total</td>
-            <td style={{ ...styles.td, fontWeight: 'bold', fontSize: '18px', color: '#000' }}>
+            <td style={{ ...styles.td, fontWeight: 'bold', fontSize: '18px', color: '#00ff00' }}>
               ${cartTotal.toFixed(2)}
             </td>
             <td style={styles.td}></td>
@@ -442,7 +442,7 @@ function OrdersPage({ orders }) {
               ))}
             </tbody>
           </table>
-          <div style={{ textAlign: 'right', fontSize: '18px', fontWeight: 'bold', color: '#000', marginTop: '8px' }}>
+          <div style={{ textAlign: 'right', fontSize: '18px', fontWeight: 'bold', color: '#00ff00', marginTop: '8px' }}>
             Total: ${order.total.toFixed(2)}
           </div>
         </div>
@@ -525,7 +525,7 @@ function AuthModal({ onAuth, onClose, loading }) {
         <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px' }}>
           {isLogin ? "Don't have an account? " : 'Already have an account? '}
           <button
-            style={{ background: 'none', border: 'none', color: '#000', cursor: 'pointer', fontWeight: '600' }}
+            style={{ background: 'none', border: 'none', color: '#00ff00', cursor: 'pointer', fontWeight: '600' }}
             onClick={() => { setIsLogin(!isLogin); setLocalError(''); }}
           >
             {isLogin ? 'Register' : 'Login'}
