@@ -77,6 +77,8 @@ export TF_VAR_alert_email="${ALERT_EMAIL:-}"
 export TF_VAR_ses_from_email="${SES_FROM_EMAIL:-}"
 export TF_VAR_monthly_budget_usd="${MONTHLY_BUDGET_USD:-30}"
 export TF_VAR_owner_email="${OWNER_EMAIL:-team@cloudmart.example}"
+# SES sandbox: route demo order emails to your verified address (defaults to the sender).
+export DEMO_RECIPIENT_EMAIL="${DEMO_RECIPIENT_EMAIL:-${SES_FROM_EMAIL:-}}"
 
 # ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
 # (k8s/helm/* is excluded — Helm renders the registry from its own values.)
@@ -84,6 +86,8 @@ log "Substituting ACCOUNT_ID=$ACCOUNT_ID and region=$AWS_REGION in k8s/ manifest
 find "$K8S_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
   sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" "$f"
 done
+# Inject demo email recipient (SES sandbox sends only to verified addresses).
+sedi "s|__DEMO_RECIPIENT__|${DEMO_RECIPIENT_EMAIL}|g" "$K8S_DIR/base/configmap.yaml"
 log "Placeholder substitution complete."
 
 # ── 4  Bootstrap — Terraform remote state ────────────────────────────────────
@@ -250,6 +254,8 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   -n kube-system --wait \
   --set "autoDiscovery.clusterName=$CLUSTER_NAME" \
   --set "awsRegion=$AWS_REGION" \
+  --set "rbac.serviceAccount.create=true" \
+  --set "rbac.serviceAccount.name=cluster-autoscaler" \
   --set "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$AS_ROLE_ARN"
 
 helm upgrade --install argo-rollouts argo/argo-rollouts \

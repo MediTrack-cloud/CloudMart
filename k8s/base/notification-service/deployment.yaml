@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: cloudmart-notification-secrets
                   key: FROM_EMAIL
+            - name: DEMO_RECIPIENT_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: DEMO_RECIPIENT_EMAIL
             - name: AWS_REGION
               valueFrom:
                 configMapKeyRef:

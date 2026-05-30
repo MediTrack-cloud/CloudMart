@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 660" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ad" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#334155"/></marker>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#ef4444"/></marker>
+    <marker id="apu" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8b5cf6"/></marker>
+  </defs>
+  <rect width="1180" height="660" fill="#ffffff"/>
+  <text x="590" y="32" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">D5 — CloudMart Disaster Recovery</text>
+
+  <rect x="30" y="60" width="345" height="410" rx="12" fill="#e6fbf3" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="48" y="86" font-size="17" font-weight="600" fill="#0e7490">Backup Strategy</text>
+  <rect x="50" y="104" width="305" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="202" y="135" text-anchor="middle" font-size="13" fill="#1e293b">RDS automated backup 7-day + PITR</text>
+  <rect x="50" y="172" width="305" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="202" y="203" text-anchor="middle" font-size="13" fill="#1e293b">DynamoDB PITR (35-day window)</text>
+  <rect x="50" y="240" width="305" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="202" y="266" text-anchor="middle" font-size="12" fill="#1e293b">Velero daily 02:00 UTC -&gt; S3</text>
+  <text x="202" y="283" text-anchor="middle" font-size="12" fill="#475569">(KMS, versioned)</text>
+  <rect x="50" y="308" width="305" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="202" y="339" text-anchor="middle" font-size="13" fill="#1e293b">Terraform state S3 + DynamoDB lock</text>
+  <rect x="50" y="376" width="305" height="52" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
+  <text x="202" y="407" text-anchor="middle" font-size="13" fill="#1e293b">K8s manifests versioned in Git</text>
+
+  <rect x="400" y="60" width="470" height="410" rx="12" fill="#fff4e6" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="418" y="86" font-size="17" font-weight="600" fill="#9a5030">Failover &amp; Restore Paths</text>
+  <rect x="420" y="104" width="185" height="52" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="512" y="135" text-anchor="middle" font-size="14" fill="#1e293b">RDS primary (1a)</text>
+  <rect x="680" y="104" width="175" height="52" rx="8" fill="#dceefb" stroke="#4a9eed"/>
+  <text x="767" y="135" text-anchor="middle" font-size="14" fill="#1e293b">RDS standby (1b)</text>
+  <line x1="605" y1="130" x2="680" y2="130" stroke="#ef4444" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="610" y="122" font-size="11" fill="#b91c1c">auto &lt; 2m</text>
+  <rect x="420" y="196" width="185" height="52" rx="8" fill="#ffe9cc" stroke="#f59e0b"/>
+  <text x="512" y="227" text-anchor="middle" font-size="13" fill="#1e293b">Route53 health check</text>
+  <rect x="680" y="196" width="175" height="52" rx="8" fill="#d7f7dd" stroke="#22c55e"/>
+  <text x="767" y="227" text-anchor="middle" font-size="14" fill="#1e293b">ALB /health</text>
+  <line x1="605" y1="222" x2="680" y2="222" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <rect x="540" y="290" width="250" height="52" rx="8" fill="#ffe0e0" stroke="#ef4444"/>
+  <text x="665" y="321" text-anchor="middle" font-size="14" fill="#1e293b">S3 maintenance page</text>
+  <line x1="500" y1="248" x2="620" y2="290" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#ar)"/>
+  <text x="500" y="278" font-size="11" fill="#b91c1c">3 fails ~90s</text>
+  <rect x="420" y="388" width="435" height="52" rx="8" fill="#ece3ff" stroke="#8b5cf6"/>
+  <text x="637" y="419" text-anchor="middle" font-size="14" fill="#1e293b">Velero restore -&gt; cloudmart-prod namespace</text>
+  <line x1="202" y1="292" x2="420" y2="405" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#apu)"/>
+
+  <rect x="895" y="60" width="255" height="410" rx="12" fill="#fffbe6" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="913" y="86" font-size="16" font-weight="600" fill="#9a5030">RTO / RPO Targets</text>
+  <rect x="910" y="104" width="225" height="48" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="1022" y="133" text-anchor="middle" font-size="13" fill="#1e293b">RDS: RPO 5m / RTO 2m</text>
+  <rect x="910" y="166" width="225" height="48" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="1022" y="195" text-anchor="middle" font-size="13" fill="#1e293b">EKS: RPO 24h / RTO 30m</text>
+  <rect x="910" y="228" width="225" height="48" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="1022" y="257" text-anchor="middle" font-size="13" fill="#1e293b">DynamoDB: RPO 5m / RTO 5m</text>
+  <rect x="910" y="290" width="225" height="48" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="1022" y="319" text-anchor="middle" font-size="13" fill="#1e293b">Infra: RTO 60m (Terraform)</text>
+  <rect x="910" y="352" width="225" height="48" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
+  <text x="1022" y="381" text-anchor="middle" font-size="13" fill="#1e293b">DNS failover: RTO 30s</text>
+
+  <text x="40" y="520" font-size="16" font-weight="600" fill="#2563eb">Estimated Recovery Timeline</text>
+  <line x1="60" y1="575" x2="1130" y2="575" stroke="#334155" stroke-width="2" marker-end="url(#ad)"/>
+  <circle cx="135" cy="575" r="7" fill="#ef4444"/>
+  <text x="135" y="558" text-anchor="middle" font-size="13" fill="#ef4444">30s DNS</text>
+  <circle cx="385" cy="575" r="7" fill="#4a9eed"/>
+  <text x="385" y="600" text-anchor="middle" font-size="13" fill="#4a9eed">2m RDS</text>
+  <circle cx="620" cy="575" r="7" fill="#06b6d4"/>
+  <text x="620" y="558" text-anchor="middle" font-size="13" fill="#06b6d4">5m DynamoDB</text>
+  <circle cx="850" cy="575" r="7" fill="#8b5cf6"/>
+  <text x="850" y="600" text-anchor="middle" font-size="13" fill="#8b5cf6">30m Velero</text>
+  <circle cx="1060" cy="575" r="7" fill="#f59e0b"/>
+  <text x="1060" y="558" text-anchor="middle" font-size="13" fill="#9a5030">60m rebuild</text>
+</svg>

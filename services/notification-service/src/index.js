@@ -30,6 +30,7 @@ try {
 const app = express();
 const PORT = process.env.PORT || 8004;
 const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://order-service:8002';
+const RECIPIENT_OVERRIDE = process.env.DEMO_RECIPIENT_EMAIL || '';
 
 const processedEvents = new Set();
 const notificationLog = [];
@@ -124,7 +125,7 @@ async function processOrderEvent(event) {
       `Thank you for shopping with CloudMart!`,
     ].join('\n');
 
-    const recipientEmail = `${event.userId}@cloudmart.example`;
+    const recipientEmail = RECIPIENT_OVERRIDE || `${event.userId}@cloudmart.example`;
     await sendEmail(recipientEmail, subject, body);
     console.log(`[Notification] Processed ORDER_CREATED for ${event.orderId} — ${formatCurrency(event.total)}`);
 
@@ -138,7 +139,7 @@ async function processOrderEvent(event) {
       `Thank you for shopping with CloudMart!`,
     ].join('\n');
 
-    const recipientEmail = `${event.userId}@cloudmart.example`;
+    const recipientEmail = RECIPIENT_OVERRIDE || `${event.userId}@cloudmart.example`;
     await sendEmail(recipientEmail, subject, body);
     console.log(`[Notification] Processed ORDER_STATUS_CHANGED for ${event.orderId} → ${event.newStatus}`);
   }
