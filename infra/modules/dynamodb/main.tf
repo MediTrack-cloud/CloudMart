@@ -13,6 +13,7 @@ resource "aws_dynamodb_table" "products" {
     kms_key_arn = var.kms_key_arn
   }
 
+  # Point-in-time recovery enabled for disaster recovery compliance
   point_in_time_recovery {
     enabled = true
   }
