@@ -200,6 +200,24 @@ aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].AllocationId
     [[ -n "$EIP" ]] && { log "  ✕ EIP $EIP"; aws ec2 release-address --allocation-id "$EIP" 2>/dev/null || true; }
   done
 
+# ── 8b  Delete self-signed ACM cert imported by deploy.sh (not Terraform-managed)
+# Must run AFTER the ALB is gone (ingress deleted + terraform destroy), or ACM
+# returns ResourceInUseException.
+log "Deleting self-signed ACM certificate(s) for $ENV …"
+for ARN in $(aws acm list-certificates --region "$AWS_REGION" --query 'CertificateSummaryList[].CertificateArn' --output text 2>/dev/null); do
+  [[ -z "$ARN" ]] && continue
+  NM=$(aws acm list-tags-for-certificate --region "$AWS_REGION" --certificate-arn "$ARN" \
+        --query "Tags[?Key=='Name'].Value | [0]" --output text 2>/dev/null)
+  if [[ "$NM" == "cloudmart-selfsigned-$ENV" ]]; then
+    log "  ✕ ACM cert $ARN ($NM)"
+    # Retry in case the ALB ENIs are still detaching
+    for attempt in 1 2 3; do
+      aws acm delete-certificate --region "$AWS_REGION" --certificate-arn "$ARN" 2>/dev/null && break
+      warn "  cert still in use (attempt $attempt/3) — waiting 20s for ALB teardown …"; sleep 20
+    done
+  fi
+done
+
 # ── 9  Verify zero residual cost resources ───────────────────────────────────
 echo ""
 log "══════════════════════════════════════════════════════════════"
@@ -235,6 +253,12 @@ check "S3 Buckets" \
 
 check "DynamoDB Tables" \
   "$(aws dynamodb list-tables --query 'TableNames[?contains(@,`cloudmart`)]' --output text 2>/dev/null)"
+
+check "ACM Certificates (self-signed)" \
+  "$(for a in $(aws acm list-certificates --region "$AWS_REGION" --query 'CertificateSummaryList[].CertificateArn' --output text 2>/dev/null); do aws acm list-tags-for-certificate --region "$AWS_REGION" --certificate-arn "$a" --query "Tags[?Key=='Name'].Value|[0]" --output text 2>/dev/null | grep -q "^cloudmart" && echo "$a"; done)"
+
+check "EKS Node Groups (EC2)" \
+  "$(aws ec2 describe-instances --filters 'Name=tag:Project,Values=cloudmart' 'Name=instance-state-name,Values=running,pending,stopping,stopped' --query 'Reservations[].Instances[].InstanceId' --output text 2>/dev/null)"
 
 echo ""
 log "══════════════════════════════════════════════════════════════"
