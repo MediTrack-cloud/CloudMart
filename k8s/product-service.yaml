@@ -24,7 +24,7 @@ spec:
       # serviceAccountName: product-service-sa
       containers:
       - name: product-service
-        image: <YOUR-REGISTRY>/product-service:latest   # Replace with your registry URI
+        image: <YOUR-REGISTRY>/product-service:1.0.0   # Replace with your registry URI
         ports:
         - containerPort: 8001
         env:

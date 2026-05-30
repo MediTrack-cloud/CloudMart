@@ -26,7 +26,7 @@ spec:
         fsGroup: 101
       containers:
         - name: frontend
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/frontend:latest
+          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/frontend:1.0.0
           ports:
             - containerPort: 80
           resources:

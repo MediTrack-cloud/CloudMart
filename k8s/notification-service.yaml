@@ -19,7 +19,7 @@ spec:
       # serviceAccountName: notification-service-sa
       containers:
       - name: notification-service
-        image: <YOUR-REGISTRY>/notification-service:latest
+        image: <YOUR-REGISTRY>/notification-service:1.0.0
         ports:
         - containerPort: 8004
         env:

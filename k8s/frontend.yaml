@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: <YOUR-REGISTRY>/frontend:latest
+        image: <YOUR-REGISTRY>/frontend:1.0.0
         ports:
         - containerPort: 80
         resources:

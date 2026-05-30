@@ -269,13 +269,25 @@ aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS \
     --password-stdin "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-log "Building and pushing 5 microservice images …"
+# Immutable tag — defaults to the pinned release the manifests reference (v1.0.0).
+# Override with IMAGE_TAG=<git-sha> to push a specific build; never uses :latest.
+IMAGE_TAG="${IMAGE_TAG:-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo 1.0.0)}"
+log "Building and pushing 5 microservice images (tag: $IMAGE_TAG) …"
 for SVC in product-service order-service user-service notification-service frontend; do
-  IMG="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart/$SVC:latest"
+  IMG="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart/$SVC:$IMAGE_TAG"
   log "  → $SVC"
   docker build -q --platform linux/amd64 -t "$IMG" "$ROOT_DIR/services/$SVC"
   docker push "$IMG"
 done
+
+# Pin the running workloads to the immutable tag just pushed.
+log "Pinning overlay images to tag $IMAGE_TAG …"
+ECR="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudmart"
+( cd "$ROOT_DIR/k8s/overlays/$ENV" && \
+  for SVC in product-service order-service user-service notification-service frontend; do
+    kustomize edit set image "$ECR/$SVC=$ECR/$SVC:$IMAGE_TAG" 2>/dev/null || true
+  done )
+kubectl apply -k "$ROOT_DIR/k8s/overlays/$ENV"
 
 # ── 12  Restart deployments ──────────────────────────────────────────────────
 log "Rolling restart to pick up new images …"

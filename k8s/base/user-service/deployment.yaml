@@ -27,7 +27,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: user-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/user-service:latest
+          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/user-service:1.0.0
           ports:
             - containerPort: 8003
           env:

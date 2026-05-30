@@ -126,13 +126,11 @@ docker compose up --build      # runs all five services with in-memory backends
 
 | Member | Role | Primary Contributions |
 |--------|------|-----------------------|
-| Madhura Weerasooriya | Platform / DevOps lead | VPC & networking, EKS, IAM/IRSA, CI/CD pipelines, cost & DR documentation |
-| _Team member 2_ | _Application_ | _Service code (product/order), Dockerfiles, DynamoDB/SQS integration_ |
-| _Team member 3_ | _Security_ | _NetworkPolicies, Kyverno, WAF/GuardDuty, secrets management_ |
-| _Team member 4_ | _Observability / Data_ | _RDS/user-service, monitoring dashboards, alarms, tracing_ |
-
-> Replace the placeholder rows with your group's actual members and a one-line summary
-> of each person's contribution before submission.
+| Madhura Jayashanka | Platform / DevOps | Environment roots (prod/staging), CI/CD pipelines, monitoring & alarms, budgets, Velero/DR, cost & DR documentation |
+| Dilshan Prasanna Allepola | Core Infrastructure | Terraform networking (VPC) and managed-data modules — RDS, DynamoDB, SQS, S3, KMS, Route 53 |
+| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, external-secrets, ArgoCD, Kyverno policies, EKS/ECR |
+| Akhila Sanjeewa | Application & Helm | Microservice source (product/order/user/notification), Helm charts and values files |
+| Himasha Kodikara | Security & Frontend | IAM/IRSA workload identity, secrets integration, frontend SPA and cross-service app wiring |
 
 ## Further Documentation
 

@@ -27,7 +27,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: notification-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/notification-service:latest
+          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/notification-service:1.0.0
           ports:
             - containerPort: 8004
           env:

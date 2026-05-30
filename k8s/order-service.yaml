@@ -24,7 +24,7 @@ spec:
       # serviceAccountName: order-service-sa
       containers:
       - name: order-service
-        image: <YOUR-REGISTRY>/order-service:latest
+        image: <YOUR-REGISTRY>/order-service:1.0.0
         ports:
         - containerPort: 8002
         env:

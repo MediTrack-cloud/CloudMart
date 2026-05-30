@@ -24,7 +24,7 @@ spec:
       # serviceAccountName: user-service-sa
       containers:
       - name: user-service
-        image: <YOUR-REGISTRY>/user-service:latest
+        image: <YOUR-REGISTRY>/user-service:1.0.0
         ports:
         - containerPort: 8003
         env:

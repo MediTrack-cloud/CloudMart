@@ -98,7 +98,6 @@ jobs:
           docker build \
             --platform linux/amd64 \
             -t ${{ steps.tag.outputs.ECR_IMAGE }} \
-            -t ${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:latest \
             services/${{ matrix.service }}
 
       - name: Trivy vulnerability scan
@@ -111,11 +110,11 @@ jobs:
           ignore-unfixed: true
 
       - name: Push to ECR
-        # Only push on push events (not PRs)
+        # Only push on push events (not PRs).
+        # Immutable SHA tag only — never a mutable :latest (keeps the keep-10
+        # lifecycle meaningful and guarantees deploys are reproducible).
         if: github.event_name == 'push'
-        run: |
-          docker push ${{ steps.tag.outputs.ECR_IMAGE }}
-          docker push ${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:latest
+        run: docker push ${{ steps.tag.outputs.ECR_IMAGE }}
 
   # ---------------------------------------------------------------------------
   # Validate Kubernetes manifests

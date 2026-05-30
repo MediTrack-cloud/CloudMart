@@ -27,7 +27,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: order-service
-          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/order-service:latest
+          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/order-service:1.0.0
           ports:
             - containerPort: 8002
           env:
