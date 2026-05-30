@@ -1,0 +1,26 @@
+# Cluster Autoscaler Helm values
+# Install: helm install cluster-autoscaler autoscaler/cluster-autoscaler \
+#            -n kube-system -f k8s/helm-values/cluster-autoscaler.yaml
+autoDiscovery:
+  clusterName: cloudmart-prod
+
+awsRegion: us-east-1
+
+rbac:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::898865655202:role/cloudmart-cluster-autoscaler-role-staging
+
+extraArgs:
+  balance-similar-node-groups: "true"
+  skip-nodes-with-system-pods: "false"
+  scale-down-delay-after-add: "5m"
+  scale-down-unneeded-time: "5m"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 300Mi
+  limits:
+    cpu: 100m
+    memory: 300Mi

@@ -1,0 +1,34 @@
+# Kyverno Helm values
+# Install: helm install kyverno kyverno/kyverno \
+#            -n kyverno --create-namespace -f k8s/helm-values/kyverno.yaml
+
+admissionController:
+  replicas: 1   # 3 for prod HA
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+
+backgroundController:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+cleanupController:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+reportsController:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
