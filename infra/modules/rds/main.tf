@@ -40,6 +40,7 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name    = aws_db_subnet_group.main.name
   vpc_security_group_ids  = [var.rds_sg_id]
   parameter_group_name    = aws_db_parameter_group.postgres.name
+  # Backup retention: 7 days for prod, disabled for staging to save cost
   backup_retention_period = var.environment == "prod" ? 7 : 0
   backup_window           = "02:00-03:00"
   maintenance_window      = "Mon:03:00-Mon:04:00"
