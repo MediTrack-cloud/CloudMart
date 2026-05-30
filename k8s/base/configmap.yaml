@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudmart-config
+  namespace: cloudmart-prod
+data:
+  # Store backends
+  PRODUCT_STORE_BACKEND: "dynamodb"
+  DB_BACKEND:            "postgres"
+  QUEUE_BACKEND:         "sqs"
+  EMAIL_BACKEND:         "ses"
+  # Service URLs (internal ClusterIP DNS)
+  PRODUCT_SERVICE_URL:   "http://product-service:8001"
+  ORDER_SERVICE_URL:     "http://order-service:8002"
+  # AWS Config
+  AWS_REGION:            "us-east-1"
+  # App Config
+  JWT_EXPIRY_HOURS:      "24"
+  POLL_INTERVAL_MS:      "5000"
+  # X-Ray distributed tracing
+  XRAY_DAEMON_ADDRESS:   "xray-service.xray:2000"
+  AWS_XRAY_SDK_ENABLED:  "true"

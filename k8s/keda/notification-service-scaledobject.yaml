@@ -1,0 +1,38 @@
+# KEDA ScaledObject — scales notification-service based on SQS queue depth.
+# Requires KEDA to be installed: helm install keda kedacore/keda -n keda --create-namespace
+# Replace SQS_QUEUE_URL with value from Terraform output: module.sqs.queue_url
+
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-aws-credentials
+  namespace: cloudmart-prod
+spec:
+  podIdentity:
+    provider: aws
+    identityOwner: keda
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service-scaler
+  namespace: cloudmart-prod
+  labels:
+    app: notification-service
+spec:
+  scaleTargetRef:
+    name: notification-service
+  minReplicaCount: 0    # scale to zero when queue is empty — saves cost
+  maxReplicaCount: 5
+  cooldownPeriod: 60
+  pollingInterval: 15
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        # Replace with Terraform output: module.sqs.queue_url
+        queueURL: "https://sqs.us-east-1.amazonaws.com/898865655202/cloudmart-orders-prod"
+        queueLength: "5"          # scale up when 5+ messages per replica
+        awsRegion: "us-east-1"
+        identityOwner: keda
+      authenticationRef:
+        name: keda-aws-credentials

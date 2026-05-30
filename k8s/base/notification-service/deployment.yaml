@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: cloudmart-prod
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      serviceAccountName: notification-service-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: notification-service
+          image: 898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart/notification-service:latest
+          ports:
+            - containerPort: 8004
+          env:
+            - name: PORT
+              value: "8004"
+            - name: QUEUE_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: QUEUE_BACKEND
+            - name: EMAIL_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: EMAIL_BACKEND
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cloudmart-notification-secrets
+                  key: SQS_QUEUE_URL
+            - name: FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: cloudmart-notification-secrets
+                  key: FROM_EMAIL
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: AWS_REGION
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

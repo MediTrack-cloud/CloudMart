@@ -1,0 +1,35 @@
+# order-service: accept from frontend; can call product-service and SQS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-order-service-ingress
+  namespace: cloudmart-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: order-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - port: 8002
+  egress:
+    # product-service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: product-service
+      ports:
+        - port: 8001
+    # AWS SQS / HTTPS
+    - ports:
+        - port: 443
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP

@@ -1,0 +1,18 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cloudmart-product-secrets
+  namespace: cloudmart-prod
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: ClusterSecretStore
+  target:
+    name: cloudmart-product-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: DYNAMODB_TABLE
+      remoteRef:
+        key: cloudmart/product-service/staging
+        property: DYNAMODB_TABLE
