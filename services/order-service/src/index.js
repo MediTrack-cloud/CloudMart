@@ -1,16 +1,11 @@
 /**
  * CloudMart Order Service
  * Manages orders: create, read, update status.
- * Emits order events to a message queue and checks product stock.
+ * Emits order events to Amazon SQS and checks product stock.
  *
- * Data Store:
- *   - Default: In-memory array (for local dev / Docker Compose)
- *   - Cloud:   Students extend with a real database if desired
- *
- * Message Queue:
- *   - Default: In-memory event log (for local dev)
- *   - Cloud:   Set QUEUE_BACKEND=sqs|pubsub|servicebus via env var
- *              (requires workload identity / credentials)
+ * Queue:
+ *   - Default: In-memory event log (local dev / Docker Compose)
+ *   - Cloud:   Set QUEUE_BACKEND=sqs (requires IRSA)
  */
 
 const express = require('express');
@@ -19,27 +14,40 @@ const morgan = require('morgan');
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
 
+// X-Ray tracing (graceful no-op outside AWS)
+let AWSXRay;
+try {
+  AWSXRay = require('aws-xray-sdk');
+  AWSXRay.config([AWSXRay.plugins.ECSPlugin]);
+  AWSXRay.captureHTTPsGlobal(require('https'), true);
+  AWSXRay.captureHTTPsGlobal(require('http'), true);
+  console.log('[order-service] AWS X-Ray tracing enabled');
+} catch (_) {
+  console.log('[order-service] AWS X-Ray SDK not available — tracing disabled');
+}
+
 const app = express();
 const PORT = process.env.PORT || 8002;
+const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://product-service:8001';
 
-// Service discovery — product-service URL
-const PRODUCT_SERVICE_URL =
-  process.env.PRODUCT_SERVICE_URL || 'http://product-service:8001';
-
-// ---------------------------------------------------------------------------
-// Middleware
-// ---------------------------------------------------------------------------
 app.use(cors());
 app.use(express.json());
 app.use(morgan('combined'));
+
+// Strip /api prefix so routes work whether called via ALB (/api/orders) or directly (/orders)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    req.url = req.url.replace(/^\/api/, '');
+  }
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // In-memory data store
 // ---------------------------------------------------------------------------
 const orders = new Map();
-const eventLog = []; // in-memory message queue substitute
+const eventLog = [];
 
-// Seed data
 const seedOrders = [
   {
     id: 'ord-001',
@@ -58,44 +66,40 @@ const seedOrders = [
 seedOrders.forEach((o) => orders.set(o.id, o));
 
 // ---------------------------------------------------------------------------
-// Message Queue Abstraction
+// SQS client (lazy-initialised once on first use)
 // ---------------------------------------------------------------------------
+let _sqsClient = null;
 
-/**
- * Publishes an order event to the configured message queue.
- * Default: stores in-memory.
- * Students: implement the cloud adapter for your provider.
- */
+function getSQSClient() {
+  if (!_sqsClient) {
+    const { SQSClient } = require('@aws-sdk/client-sqs');
+    _sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  }
+  return _sqsClient;
+}
+
+// ---------------------------------------------------------------------------
+// Message Queue abstraction
+// ---------------------------------------------------------------------------
 async function publishOrderEvent(event) {
   const backend = (process.env.QUEUE_BACKEND || 'memory').toLowerCase();
 
   if (backend === 'sqs') {
-    // TODO: AWS SQS — use @aws-sdk/client-sqs
-    // const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
-    // const client = new SQSClient({ region: process.env.AWS_REGION });
-    // await client.send(new SendMessageCommand({
-    //   QueueUrl: process.env.SQS_QUEUE_URL,
-    //   MessageBody: JSON.stringify(event),
-    // }));
-    console.log('[SQS] Would publish event:', event.type);
-    eventLog.push(event);
-  } else if (backend === 'pubsub') {
-    // TODO: GCP Pub/Sub — use @google-cloud/pubsub
-    // const { PubSub } = require('@google-cloud/pubsub');
-    // const pubsub = new PubSub();
-    // await pubsub.topic(process.env.PUBSUB_TOPIC).publishMessage({ json: event });
-    console.log('[Pub/Sub] Would publish event:', event.type);
-    eventLog.push(event);
-  } else if (backend === 'servicebus') {
-    // TODO: Azure Service Bus — use @azure/service-bus
-    // const { ServiceBusClient } = require('@azure/service-bus');
-    // const client = new ServiceBusClient(process.env.SERVICEBUS_CONNECTION);
-    // const sender = client.createSender(process.env.SERVICEBUS_QUEUE);
-    // await sender.sendMessages({ body: event });
-    console.log('[Service Bus] Would publish event:', event.type);
-    eventLog.push(event);
+    const { SendMessageCommand } = require('@aws-sdk/client-sqs');
+    const queueUrl = process.env.SQS_QUEUE_URL;
+    if (!queueUrl) throw new Error('SQS_QUEUE_URL env var is required when QUEUE_BACKEND=sqs');
+
+    await getSQSClient().send(new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(event),
+      // Deduplication for FIFO queues
+      ...(queueUrl.endsWith('.fifo') && {
+        MessageGroupId: event.orderId,
+        MessageDeduplicationId: `${event.type}-${event.orderId}-${Date.now()}`,
+      }),
+    }));
+    console.log(`[SQS] Published ${event.type} for order ${event.orderId}`);
   } else {
-    // In-memory — just log it
     console.log(`[EventLog] ${event.type}: order ${event.orderId}`);
     eventLog.push(event);
   }
@@ -105,15 +109,12 @@ async function publishOrderEvent(event) {
 // Routes
 // ---------------------------------------------------------------------------
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'order-service' });
 });
 
-// Readiness check
 app.get('/ready', async (req, res) => {
   try {
-    // Check product-service connectivity
     await axios.get(`${PRODUCT_SERVICE_URL}/health`, { timeout: 2000 });
     res.json({ status: 'ready', service: 'order-service' });
   } catch {
@@ -121,18 +122,15 @@ app.get('/ready', async (req, res) => {
   }
 });
 
-// List all orders (optionally filter by userId)
 app.get('/orders', (req, res) => {
   let result = Array.from(orders.values());
   if (req.query.userId) {
     result = result.filter((o) => o.userId === req.query.userId);
   }
-  // Sort by createdAt descending
   result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.json({ orders: result, count: result.length });
 });
 
-// Get single order
 app.get('/orders/:orderId', (req, res) => {
   const order = orders.get(req.params.orderId);
   if (!order) {
@@ -141,7 +139,6 @@ app.get('/orders/:orderId', (req, res) => {
   res.json(order);
 });
 
-// Create a new order
 app.post('/orders', async (req, res) => {
   try {
     const { userId, items, shippingAddress } = req.body;
@@ -153,7 +150,6 @@ app.post('/orders', async (req, res) => {
       });
     }
 
-    // Validate stock for each item by calling product-service
     let total = 0;
     const enrichedItems = [];
 
@@ -170,7 +166,6 @@ app.post('/orders', async (req, res) => {
           });
         }
 
-        // Get product details
         const productRes = await axios.get(
           `${PRODUCT_SERVICE_URL}/products/${item.productId}`,
           { timeout: 3000 }
@@ -188,7 +183,6 @@ app.post('/orders', async (req, res) => {
           lineTotal,
         });
 
-        // Decrement stock
         await axios.post(
           `${PRODUCT_SERVICE_URL}/products/${item.productId}/stock/decrement`,
           { quantity },
@@ -196,16 +190,10 @@ app.post('/orders', async (req, res) => {
         );
       } catch (err) {
         if (err.response && err.response.status === 404) {
-          return res.status(404).json({
-            error: 'Not Found',
-            message: `Product ${item.productId} not found`,
-          });
+          return res.status(404).json({ error: 'Not Found', message: `Product ${item.productId} not found` });
         }
         if (err.response && err.response.status === 409) {
-          return res.status(409).json({
-            error: 'Insufficient Stock',
-            message: err.response.data.message,
-          });
+          return res.status(409).json({ error: 'Insufficient Stock', message: err.response.data.message });
         }
         throw err;
       }
@@ -224,7 +212,6 @@ app.post('/orders', async (req, res) => {
 
     orders.set(order.id, order);
 
-    // Publish order event to message queue
     await publishOrderEvent({
       type: 'ORDER_CREATED',
       orderId: order.id,
@@ -242,7 +229,6 @@ app.post('/orders', async (req, res) => {
   }
 });
 
-// Update order status
 app.patch('/orders/:orderId/status', async (req, res) => {
   const order = orders.get(req.params.orderId);
   if (!order) {
@@ -258,15 +244,15 @@ app.patch('/orders/:orderId/status', async (req, res) => {
     });
   }
 
+  const oldStatus = order.status;
   order.status = status;
   order.updatedAt = new Date().toISOString();
 
-  // Publish status change event
   await publishOrderEvent({
     type: 'ORDER_STATUS_CHANGED',
     orderId: order.id,
     userId: order.userId,
-    oldStatus: order.status,
+    oldStatus,
     newStatus: status,
     timestamp: order.updatedAt,
   });
@@ -275,22 +261,15 @@ app.patch('/orders/:orderId/status', async (req, res) => {
   res.json(order);
 });
 
-// Get event log (for debugging / demo purposes)
 app.get('/events', (req, res) => {
   res.json({ events: eventLog, count: eventLog.length });
 });
 
-// ---------------------------------------------------------------------------
-// Error handling
-// ---------------------------------------------------------------------------
 app.use((err, req, res, next) => {
   console.error('[Error]', err.stack);
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// ---------------------------------------------------------------------------
-// Start server
-// ---------------------------------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[order-service] Running on port ${PORT}`);
   console.log(`[order-service] Product service URL: ${PRODUCT_SERVICE_URL}`);

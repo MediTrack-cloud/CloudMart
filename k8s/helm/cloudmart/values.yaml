@@ -1,0 +1,110 @@
+# Base values shared across environments.
+# Override per-environment in values-prod.yaml / values-staging.yaml.
+
+global:
+  awsRegion: us-east-1
+  # Set this to your ECR registry prefix before deploying:
+  # e.g.  123456789012.dkr.ecr.us-east-1.amazonaws.com/cloudmart
+  imageRegistry: "898865655202.dkr.ecr.us-east-1.amazonaws.com/cloudmart"
+  imageTag: "latest"
+  environment: prod
+  namespace: cloudmart-prod
+
+product-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: product-service
+    pullPolicy: IfNotPresent
+  service:
+    port: 8001
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+  env:
+    STORE_BACKEND: dynamodb
+    AWS_REGION: us-east-1
+
+order-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: order-service
+    pullPolicy: IfNotPresent
+  service:
+    port: 8002
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+  env:
+    AWS_REGION: us-east-1
+
+user-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: user-service
+    pullPolicy: IfNotPresent
+  service:
+    port: 8003
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  hpa:
+    enabled: false
+  env:
+    DB_BACKEND: postgres
+    AWS_REGION: us-east-1
+
+notification-service:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: notification-service
+    pullPolicy: IfNotPresent
+  service:
+    port: 8004
+    createService: false  # no inbound HTTP
+  resources:
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
+  hpa:
+    enabled: false
+  keda:
+    enabled: true
+    minReplicaCount: 0
+    maxReplicaCount: 5
+    sqsQueueLength: 5
+  env:
+    EMAIL_BACKEND: ses
+    AWS_REGION: us-east-1
+
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: frontend
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  resources:
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  hpa:
+    enabled: false
+  ingress:
+    enabled: true
+    host: cloudmart.example
+    # Set these from Terraform outputs after first apply:
+    certificateArn: ""
+    wafAclArn: ""

@@ -1,0 +1,26 @@
+replicaCount: 2
+image:
+  repository: user-service
+  pullPolicy: IfNotPresent
+  tag: ""
+serviceAccount:
+  name: user-service-sa
+  annotations: {}
+service:
+  type: ClusterIP
+  port: 8003
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits:   { cpu: 500m, memory: 512Mi }
+hpa:
+  enabled: false
+pdb:
+  enabled: true
+  minAvailable: 1
+env:
+  DB_BACKEND: postgres
+  AWS_REGION: us-east-1
+configMapRef: cloudmart-config
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,23 @@
+{{- if .Values.keda.enabled }}
+{{- $global := .Values.global | default dict }}
+{{- $ns := $global.namespace | default (printf "cloudmart-%s" ($global.environment | default "prod")) }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service-scaler
+  namespace: {{ $ns }}
+spec:
+  scaleTargetRef:
+    name: notification-service
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  cooldownPeriod: 60
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: ""  # set via KEDA TriggerAuthentication or ConfigMap — populated at deploy time
+        queueLength: {{ .Values.keda.sqsQueueLength | quote }}
+        awsRegion: {{ .Values.keda.awsRegion }}
+      authenticationRef:
+        name: keda-aws-credentials
+{{- end }}
