@@ -260,3 +260,31 @@ resource "aws_iam_role_policy_attachment" "ebs_csi" {
   role       = aws_iam_role.ebs_csi.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
+
+# ---------------------------------------------------------------------------
+# aws-auth ConfigMap — grant GitHub Actions role kubectl access
+# The node role entry is required for worker nodes to join the cluster.
+# The GitHub Actions role entry lets the CD runner run kubectl commands.
+# ---------------------------------------------------------------------------
+resource "kubernetes_config_map_v1_data" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+  force = true
+  data = {
+    mapRoles = yamlencode([
+      {
+        rolearn  = aws_iam_role.node.arn
+        username = "system:node:{{EC2PrivateDNSName}}"
+        groups   = ["system:bootstrappers", "system:nodes"]
+      },
+      {
+        rolearn  = var.github_actions_role_arn
+        username = "github-actions"
+        groups   = ["system:masters"]
+      },
+    ])
+  }
+  depends_on = [aws_eks_node_group.main]
+}
