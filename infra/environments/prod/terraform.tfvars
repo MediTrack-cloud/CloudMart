@@ -15,7 +15,7 @@ monthly_budget_usd    = "50"
 
 # Set these before applying:
 alert_email    = "madhuraweerasooriye@gmail.com"
-ses_from_email = "" # Set to verified SES sender email, e.g. "noreply@yourdomain.com"
+ses_from_email = "madhuraweerasooriye@gmail.com" # must be a VERIFIED SES identity
 
 # Optional — uncomment once domain is registered in Route 53:
 # domain_name  = "cloudmart.yourdomain.com"
