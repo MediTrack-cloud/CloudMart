@@ -95,23 +95,23 @@ jobs:
           severity: "CRITICAL"
           ignore-unfixed: true
 
-      # ── Push to ECR only on pushes (never on pull_request) ──────────────────
-      # PRs don't (and shouldn't) have AWS access, so the OIDC assume-role only
-      # runs for push events. Immutable SHA tag only — never a mutable :latest.
+      # ── Push to ECR only on pushes to main/develop (never PRs / feature branches) ─
+      # PRs and feature branches don't (and shouldn't) get AWS access, so the OIDC
+      # assume-role runs only for the deployable branches. Immutable SHA tag only.
       - name: Configure AWS credentials (OIDC)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Tag & push to ECR
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
           ECR_IMAGE=${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:${{ github.sha }}
           docker tag cloudmart/${{ matrix.service }}:${{ github.sha }} "$ECR_IMAGE"
