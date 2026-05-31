@@ -1,5 +1,15 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-DR-01  RDS automated backups (7-day) + Multi-AZ
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   aws rds describe-db-instances --region us-east-1 --db-instance-identifier cloudmart-prod --query 'DBInstances[0].{BackupRetentionDays:BackupRetentionPeriod,BackupWindow:PreferredBackupWindow,MultiAZ:MultiAZ,Encrypted:StorageEncrypted}' --output json
+#
+# Captured: 2026-05-31 16:43:59Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
 {
-    "Retention": 7,
-    "Window": "02:00-03:00",
-    "MultiAZ": true
+    "BackupRetentionDays": 7,
+    "BackupWindow": "02:00-03:00",
+    "MultiAZ": true,
+    "Encrypted": true
 }

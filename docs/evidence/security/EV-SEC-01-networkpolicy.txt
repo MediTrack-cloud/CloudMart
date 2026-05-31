@@ -1,7 +1,16 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-SEC-01  NetworkPolicies (default-deny + allows)
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   kubectl get networkpolicy -n cloudmart-prod
+#
+# Captured: 2026-05-31 16:43:35Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
 NAME                            POD-SELECTOR          AGE
-allow-dns-egress                <none>                7h20m
-allow-frontend                  app=frontend          7h20m
-allow-order-service-ingress     app=order-service     7h20m
-allow-product-service-ingress   app=product-service   7h20m
-allow-user-service-ingress      app=user-service      7h20m
-default-deny-all                <none>                7h20m
+allow-dns-egress                <none>                7h32m
+allow-frontend                  app=frontend          7h32m
+allow-order-service-ingress     app=order-service     7h32m
+allow-product-service-ingress   app=product-service   7h32m
+allow-user-service-ingress      app=user-service      7h32m
+default-deny-all                <none>                7h32m

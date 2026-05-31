@@ -1,4 +1,13 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-OBS-00  HPA targets (60% CPU, 2-6)
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   kubectl get hpa -n cloudmart-prod
+#
+# Captured: 2026-05-31 16:43:55Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
 NAME                                   REFERENCE                         TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
-keda-hpa-notification-service-scaler   Deployment/notification-service   <unknown>/5 (avg)   1         5         0          6h33m
-order-service-hpa                      Deployment/order-service          cpu: 6%/60%         2         6         2          7h20m
-product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          7h20m
+keda-hpa-notification-service-scaler   Deployment/notification-service   <unknown>/5 (avg)   1         5         0          6h45m
+order-service-hpa                      Deployment/order-service          cpu: 7%/60%         2         6         2          7h32m
+product-service-hpa                    Deployment/product-service        cpu: 4%/60%         2         6         2          7h32m

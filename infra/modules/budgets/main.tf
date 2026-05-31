@@ -17,8 +17,10 @@ resource "aws_budgets_budget" "monthly" {
   time_unit    = "MONTHLY"
 
   cost_filter {
-    name   = "TagKeyValue"
-    values = ["user:Environment$${var.environment}"]
+    name = "TagKeyValue"
+    # Format is user:<TagKey>$<TagValue>. Use format() so the value interpolates
+    # cleanly — "user:Environment$${var.environment}" would escape to a literal.
+    values = [format("user:Environment$%s", var.environment)]
   }
 
   notification {

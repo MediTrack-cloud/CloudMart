@@ -1,3 +1,12 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-INFRA-01  Cluster nodes (2+ Ready)
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   kubectl get nodes -o wide
+#
+# Captured: 2026-05-31 16:42:05Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
 NAME                          STATUS   ROLES    AGE   VERSION                INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                    CONTAINER-RUNTIME
 ip-10-0-10-73.ec2.internal    Ready    <none>   8h    v1.30.14-eks-3385e9b   10.0.10.73    <none>        Amazon Linux 2023.11.20260526   6.1.172-216.329.amzn2023.x86_64   containerd://2.2.3+unknown
 ip-10-0-11-219.ec2.internal   Ready    <none>   8h    v1.30.14-eks-3385e9b   10.0.11.219   <none>        Amazon Linux 2023.11.20260526   6.1.172-216.329.amzn2023.x86_64   containerd://2.2.3+unknown
