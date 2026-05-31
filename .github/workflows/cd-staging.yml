@@ -53,7 +53,9 @@ jobs:
             "$ECR/frontend=$ECR/frontend:$SHA"
 
       - name: Apply manifests
-        run: kubectl apply -k k8s/overlays/staging
+        # Overlays reference files in ../../base, so build with LoadRestrictionsNone
+        # (kubectl apply -k can't pass that flag). kustomize is preinstalled on the runner.
+        run: kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/staging | kubectl apply -f -
 
       - name: Wait for rollouts to complete
         run: |
