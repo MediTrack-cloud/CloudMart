@@ -32,7 +32,7 @@ services depend on (RDS, DynamoDB, SQS, SES, Secrets Manager, KMS).
   private-data), IGW + NAT gateways, per-tier route tables, security groups scoped by
   least privilege, S3/DynamoDB gateway endpoints, Secrets Manager/ECR interface
   endpoints, and VPC Flow Logs shipped to CloudWatch.
-- **Compute** — EKS managed node group (t3.medium, IMDSv2 enforced) with Cluster
+- **Compute** — EKS managed node group (m7i-flex.large, IMDSv2 enforced) with Cluster
   Autoscaler; all five services run 2+ replicas with HPA, PDB, probes, and a rolling
   strategy of `maxSurge:1 / maxUnavailable:0`.
 - **Security** — per-service IRSA roles (resource-scoped, no node-level data access),

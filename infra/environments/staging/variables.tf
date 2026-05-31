@@ -36,7 +36,7 @@ variable "rds_multi_az" {
 
 variable "node_instance_type" {
   type    = string
-  default = "t3.small"
+  default = "m7i-flex.large"
 }
 
 variable "eks_min_nodes" {
