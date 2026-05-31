@@ -52,17 +52,8 @@ jobs:
             "$ECR/notification-service=$ECR/notification-service:$SHA" \
             "$ECR/frontend=$ECR/frontend:$SHA"
 
-      - name: Apply manifests (ArgoCD auto-syncs on develop push — kubectl as fallback)
-        run: |
-          if kubectl get deploy argocd-server -n argocd &>/dev/null; then
-            echo "ArgoCD installed — staging application has auto-sync enabled, waiting for sync"
-            # Wait up to 3 minutes for auto-sync to complete
-            sleep 30
-            kubectl get application cloudmart-staging -n argocd -o jsonpath='{.status.sync.status}' || true
-          else
-            echo "ArgoCD not detected — applying via kubectl"
-            kubectl apply -k k8s/overlays/staging
-          fi
+      - name: Apply manifests
+        run: kubectl apply -k k8s/overlays/staging
 
       - name: Wait for rollouts to complete
         run: |
