@@ -14,9 +14,9 @@ spec:
   data:
     - secretKey: SQS_QUEUE_URL
       remoteRef:
-        key: cloudmart/notification-service/staging
+        key: cloudmart/notification-service/__ENV__
         property: SQS_QUEUE_URL
     - secretKey: FROM_EMAIL
       remoteRef:
-        key: cloudmart/notification-service/staging
+        key: cloudmart/notification-service/__ENV__
         property: FROM_EMAIL

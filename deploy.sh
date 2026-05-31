@@ -82,9 +82,9 @@ export DEMO_RECIPIENT_EMAIL="${DEMO_RECIPIENT_EMAIL:-${SES_FROM_EMAIL:-}}"
 
 # ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
 # (k8s/helm/* is excluded — Helm renders the registry from its own values.)
-log "Substituting ACCOUNT_ID=$ACCOUNT_ID and region=$AWS_REGION in k8s/ manifests …"
+log "Substituting ACCOUNT_ID=$ACCOUNT_ID, region=$AWS_REGION, env=$ENV in k8s/ manifests …"
 find "$K8S_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
-  sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" "$f"
+  sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" -e "s/__ENV__/$ENV/g" "$f"
 done
 # Inject demo email recipient (SES sandbox sends only to verified addresses).
 sedi "s|__DEMO_RECIPIENT__|${DEMO_RECIPIENT_EMAIL}|g" "$K8S_DIR/base/configmap.yaml"

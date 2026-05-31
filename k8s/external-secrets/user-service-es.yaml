@@ -14,9 +14,9 @@ spec:
   data:
     - secretKey: DATABASE_URL
       remoteRef:
-        key: cloudmart/rds/user-service/staging
+        key: cloudmart/rds/user-service/__ENV__
         property: DATABASE_URL
     - secretKey: JWT_SECRET
       remoteRef:
-        key: cloudmart/user-service/staging
+        key: cloudmart/user-service/__ENV__
         property: JWT_SECRET

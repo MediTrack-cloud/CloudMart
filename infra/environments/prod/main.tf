@@ -153,3 +153,43 @@ module "route53" {
 
   failover_bucket_website_endpoint = module.s3.dr_website_endpoint
 }
+
+# ---------------------------------------------------------------------------
+# Application secrets (service config stored in Secrets Manager)
+# Consumed by the External Secrets Operator -> k8s Secrets per service.
+# ---------------------------------------------------------------------------
+resource "random_password" "jwt_secret" {
+  length  = 64
+  special = false
+}
+
+locals {
+  app_secrets = {
+    "cloudmart/order-service/${var.environment}" = jsonencode({
+      SQS_QUEUE_URL = module.sqs.queue_url
+    })
+    "cloudmart/product-service/${var.environment}" = jsonencode({
+      DYNAMODB_TABLE = module.dynamodb.table_name
+    })
+    "cloudmart/notification-service/${var.environment}" = jsonencode({
+      SQS_QUEUE_URL = module.sqs.queue_url
+      FROM_EMAIL    = var.ses_from_email
+    })
+    "cloudmart/user-service/${var.environment}" = jsonencode({
+      JWT_SECRET = random_password.jwt_secret.result
+    })
+  }
+}
+
+resource "aws_secretsmanager_secret" "app" {
+  for_each                = local.app_secrets
+  name                    = each.key
+  kms_key_id              = module.kms.app_key_arn
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "app" {
+  for_each      = local.app_secrets
+  secret_id     = aws_secretsmanager_secret.app[each.key].id
+  secret_string = each.value
+}
