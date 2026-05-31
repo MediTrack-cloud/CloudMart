@@ -77,44 +77,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Build + scan need no AWS — runs on PRs and pushes alike. A local tag keeps
+      # PRs (incl. forks) from ever needing OIDC/ECR credentials.
+      - name: Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t cloudmart/${{ matrix.service }}:${{ github.sha }} \
+            services/${{ matrix.service }}
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cloudmart/${{ matrix.service }}:${{ github.sha }}
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL"
+          ignore-unfixed: true
+
+      # ── Push to ECR only on pushes to main/develop (never PRs / feature branches) ─
+      # PRs and feature branches don't (and shouldn't) get AWS access, so the OIDC
+      # assume-role runs only for the deployable branches. Immutable SHA tag only.
       - name: Configure AWS credentials (OIDC)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tag
-        id: tag
+      - name: Tag & push to ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         run: |
-          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "ECR_IMAGE=${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:${{ github.sha }}" >> $GITHUB_OUTPUT
-
-      - name: Build Docker image
-        run: |
-          docker build \
-            --platform linux/amd64 \
-            -t ${{ steps.tag.outputs.ECR_IMAGE }} \
-            services/${{ matrix.service }}
-
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ steps.tag.outputs.ECR_IMAGE }}
-          format: "table"
-          exit-code: "1"
-          severity: "CRITICAL"
-          ignore-unfixed: true
-
-      - name: Push to ECR
-        # Only push on push events (not PRs).
-        # Immutable SHA tag only — never a mutable :latest (keeps the keep-10
-        # lifecycle meaningful and guarantees deploys are reproducible).
-        if: github.event_name == 'push'
-        run: docker push ${{ steps.tag.outputs.ECR_IMAGE }}
+          ECR_IMAGE=${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:${{ github.sha }}
+          docker tag cloudmart/${{ matrix.service }}:${{ github.sha }} "$ECR_IMAGE"
+          docker push "$ECR_IMAGE"
 
   # ---------------------------------------------------------------------------
   # Validate Kubernetes manifests
