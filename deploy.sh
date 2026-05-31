@@ -80,6 +80,25 @@ export TF_VAR_owner_email="${OWNER_EMAIL:-team@cloudmart.example}"
 # SES sandbox: route demo order emails to your verified address (defaults to the sender).
 export DEMO_RECIPIENT_EMAIL="${DEMO_RECIPIENT_EMAIL:-${SES_FROM_EMAIL:-}}"
 
+# ── SES sandbox: ensure sender + demo recipient are verified identities ──────
+# SES silently rejects mail to/from unverified addresses while in sandbox.
+# verify-email-identity is idempotent; the user must click the link once per address.
+_ses_addrs="${TF_VAR_ses_from_email}"
+[ -n "$DEMO_RECIPIENT_EMAIL" ] && [ "$DEMO_RECIPIENT_EMAIL" != "$TF_VAR_ses_from_email" ] \
+  && _ses_addrs="$_ses_addrs $DEMO_RECIPIENT_EMAIL"
+for _addr in $_ses_addrs; do
+  [ -n "$_addr" ] || continue
+  _status=$(aws ses get-identity-verification-attributes --identities "$_addr" \
+    --region "$AWS_REGION" \
+    --query "VerificationAttributes.\"$_addr\".VerificationStatus" --output text 2>/dev/null || echo None)
+  if [ "$_status" = "Success" ]; then
+    log "SES identity '$_addr' already verified."
+  else
+    aws ses verify-email-identity --email-address "$_addr" --region "$AWS_REGION" 2>/dev/null || true
+    warn "SES identity '$_addr' is not verified ($_status). A verification email was sent — CLICK THE LINK (check inbox/spam). Mail won't send until you do."
+  fi
+done
+
 # ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
 # (k8s/helm/* is excluded — Helm renders the registry from its own values.)
 log "Substituting ACCOUNT_ID=$ACCOUNT_ID, region=$AWS_REGION, env=$ENV in k8s/ manifests …"
@@ -275,6 +294,14 @@ kubectl apply -f "$K8S_DIR/xray/"
 
 log "Applying Kustomize overlay ($ENV) …"
 kustomize build --load-restrictor LoadRestrictionsNone "$K8S_DIR/overlays/$ENV" | kubectl apply -f -
+
+# Force ESO to pull the latest Secrets Manager values NOW (refreshInterval is 1h, so a
+# changed value — e.g. ses_from_email — would otherwise lag), then wait for the synced
+# k8s Secrets to exist before the app pods need them (avoids CreateContainerConfigError).
+log "Syncing External Secrets from Secrets Manager …"
+kubectl annotate externalsecret --all -n "$NAMESPACE" "force-sync=$(date +%s)" --overwrite 2>/dev/null || true
+kubectl wait --for=condition=Ready externalsecret --all -n "$NAMESPACE" --timeout=180s \
+  || warn "Some ExternalSecrets not Ready after 180s — check 'kubectl get externalsecret -n $NAMESPACE'."
 
 log "Applying KEDA ScaledObject …"
 kubectl apply -f "$KEDA_FILE"
