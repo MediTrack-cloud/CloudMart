@@ -146,7 +146,7 @@ cd ~/Desktop/CloudMart-demo
 | 5 | Patches Ingress for HTTP-only (no domain needed) | instant |
 | 6 | Injects real IAM role ARNs into Helm value files and K8s manifests | instant |
 | 7 | `aws eks update-kubeconfig` — connects kubectl | 5s |
-| 8 | Installs 8 Helm charts: AWS LB Controller, Metrics Server, External Secrets, KEDA, Kyverno, Cluster Autoscaler, Argo Rollouts, Velero | 3–5 min |
+| 8 | Installs 7 Helm charts: AWS LB Controller, Metrics Server, External Secrets, KEDA, Kyverno, Cluster Autoscaler, Velero | 3–5 min |
 | 9 | Applies Kyverno policies, X-Ray DaemonSet, KEDA ScaledObject, Kustomize overlay | 30s |
 | 10 | Builds 5 Docker images and pushes to ECR | 3–5 min |
 | 11 | Rolling restart of all deployments | 30s |
@@ -263,7 +263,7 @@ git merge develop
 git push origin main
 ```
 
-→ CI runs → **Manual approval gate** in GitHub (you click "Approve") → Velero backup snapshot → CD deploys to production → Argo Rollouts canary for product-service
+→ CI runs → **Manual approval gate** in GitHub (you click "Approve") → Velero backup snapshot → CD deploys to production → health-gated rolling update for all services
 
 ---
 

@@ -1,0 +1,22 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-COST-02  Monthly budget + alert (filter Environment=prod)
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   aws budgets describe-budget --account-id 898865655202 --budget-name cloudmart-monthly-prod --query 'Budget.{Name:BudgetName,Limit:BudgetLimit,Filter:CostFilters,TimeUnit:TimeUnit}' --output json
+#
+# Captured: 2026-05-31 16:43:57Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
+{
+    "Name": "cloudmart-monthly-prod",
+    "Limit": {
+        "Amount": "50.0",
+        "Unit": "USD"
+    },
+    "Filter": {
+        "TagKeyValue": [
+            "user:Environment$prod"
+        ]
+    },
+    "TimeUnit": "MONTHLY"
+}

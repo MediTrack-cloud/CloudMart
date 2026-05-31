@@ -231,7 +231,6 @@ helm repo add external-secrets https://charts.external-secrets.io          2>/de
 helm repo add kedacore       https://kedacore.github.io/charts             2>/dev/null || true
 helm repo add kyverno        https://kyverno.github.io/kyverno/            2>/dev/null || true
 helm repo add autoscaler     https://kubernetes.github.io/autoscaler       2>/dev/null || true
-helm repo add argo           https://argoproj.github.io/argo-helm          2>/dev/null || true
 helm repo add vmware-tanzu   https://vmware-tanzu.github.io/helm-charts    2>/dev/null || true
 helm repo update
 
@@ -276,10 +275,6 @@ helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   --set "rbac.serviceAccount.create=true" \
   --set "rbac.serviceAccount.name=cluster-autoscaler" \
   --set "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$AS_ROLE_ARN"
-
-helm upgrade --install argo-rollouts argo/argo-rollouts \
-  -n argo-rollouts --create-namespace --wait \
-  -f "$K8S_DIR/helm-values/argo-rollouts.yaml"
 
 helm upgrade --install velero vmware-tanzu/velero \
   -n velero --create-namespace --wait \

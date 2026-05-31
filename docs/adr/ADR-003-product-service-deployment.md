@@ -11,64 +11,67 @@
 The `product-service` is the highest-read-volume service in CloudMart — every page load, search, and order placement queries it. Deploying a bad version can directly impact all user-facing features.
 
 We need a deployment strategy that:
-- Minimises blast radius during a bad release
-- Allows automated or manual rollback
+- Minimises capacity loss and user impact during a release
+- Allows automated rollback when a release is unhealthy
 - Does not require double the resources (blue/green is expensive for a student project)
-- Integrates with the existing Kubernetes on EKS setup
-- Satisfies the distinction requirement for advanced deployment techniques
+- Integrates cleanly with the existing Kubernetes-on-EKS + GitHub Actions setup
+- Matches CloudMart's current scale and the team's operational maturity
 
-The assignment specifically mentions **Argo Rollouts or Flagger for canary** as a distinction requirement.
+The brief lists **Argo Rollouts / Flagger canary** as a *distinction* option, but also requires a working, health-gated rolling deployment as the mandatory baseline.
 
 ## Considered Options
 
-| Strategy | Tool | Blast Radius | Resource Cost | Rollback Speed | Complexity |
-|----------|------|-------------|---------------|----------------|------------|
-| Rolling update | Kubernetes native | Medium (old + new run concurrently) | Low (1 extra pod) | Slow (manual undo) | Low |
-| **Canary** | **Argo Rollouts** | **Low (20% initially)** | **Low (+1–2 pods)** | **Fast (abort command)** | **Medium** |
-| Blue/Green | Argo Rollouts | Very low (zero downtime) | High (2× pods) | Instant | Medium |
-| Feature flags | LaunchDarkly / AWS AppConfig | Very low | Medium | Instant | High |
+| Strategy | Tool | Capacity during deploy | Resource Cost | Rollback | Complexity |
+|----------|------|------------------------|---------------|----------|------------|
+| **Rolling update** | **Kubernetes native** | **No loss (`maxUnavailable:0`)** | **Low (+1 surge pod)** | **Automated (`rollout undo`)** | **Low** |
+| Canary | Argo Rollouts | No loss (20% → 100%) | Low (+1–2 pods) | Fast (abort) | Medium — extra controller + CRDs + CLI plugin |
+| Blue/Green | Argo Rollouts | No loss | High (2× pods) | Instant | Medium |
+| Feature flags | LaunchDarkly / AWS AppConfig | No loss | Medium | Instant | High |
 
 ## Decision
 
-**Use Argo Rollouts with a canary strategy: 20% → 40% → 100%, with CloudWatch-based analysis.**
+**Use a health-gated Kubernetes rolling update** (`strategy.rollingUpdate: maxSurge:1, maxUnavailable:0`) for `product-service` in both staging and production, driven by the GitHub Actions CD pipeline.
 
-Canary steps (defined in `k8s/argo-rollouts/product-service-rollout.yaml`):
-1. Deploy canary at **20%** of traffic
-2. Pause 1 minute — observe error rate via AnalysisTemplate
-3. Advance to **40%** traffic
-4. Pause 1 minute — final check
-5. Promote to **100%** — old version is scaled down
-
-The AnalysisTemplate queries CloudWatch for `HTTPCode_Target_5XX_Count / RequestCount`. If the success rate drops below 99% (i.e. error rate exceeds 1%) during any step, the rollout is automatically aborted and the canary is rolled back.
+How it works:
+1. CD bumps the image tag in the Kustomize overlay and applies it (`kustomize build … | kubectl apply -f -`).
+2. Kubernetes brings up a new pod (`maxSurge:1`) and **only retires an old pod once the new one passes its readiness probe** (`maxUnavailable:0`) — so capacity never drops.
+3. The pipeline **gates** on `kubectl rollout status deployment/product-service --timeout=300s`.
+4. On any failure (rollout timeout or smoke-test failure) the pipeline runs **`kubectl rollout undo`**, automatically reverting to the last good ReplicaSet.
 
 Rationale:
-- **Low blast radius**: only 20% of users see the new version initially — a bug affects 1 in 5 requests, not all
-- **Automated safety**: CloudWatch analysis prevents promotion if error rate exceeds threshold — no manual monitoring needed during deployment
-- **Cost efficient**: requires only 1–2 extra pods during the canary window (~5 minutes), not double the full fleet
-- **Distinction requirement**: satisfies the assignment's requirement for Argo Rollouts canary
-- **Fast rollback**: `kubectl argo rollouts abort product-service` immediately reverts to 0% canary traffic
+- **No capacity loss**: `maxUnavailable:0` + readiness gating means users never hit an unready pod.
+- **Automated rollback**: `rollout undo` on failure — no manual intervention.
+- **Cost efficient**: a single surge pod during the deploy, not a second fleet (blue/green) or a parallel canary stack + controller.
+- **Right-sized complexity**: no extra controller, CRDs, or `kubectl` plugin to install and operate — appropriate for CloudMart's current traffic and team size.
 
 ## Consequences
 
 **Positive:**
-- Reduced deployment risk for the highest-traffic service
-- Automated rollback on error threshold breach
-- CD pipeline integrates cleanly: `kubectl argo rollouts set image product-service ...` triggers canary
-- Demo value: the progressive weight change is visible in the Argo Rollouts dashboard
+- Zero-downtime deploys for the highest-traffic service, with automatic revert on failure.
+- CD integrates with plain `kubectl` — no extra controller or CLI plugin (this also removed a class of pipeline failures).
+- `product-service` is a standard `Deployment`, identical in staging and prod, so behaviour is uniform and easy to reason about.
 
 **Negative:**
-- Requires Argo Rollouts controller installed in the cluster (~150MB memory)
-- The `product-service` Deployment in prod is replaced by a Rollout resource — kubectl rollout commands do not apply directly; must use `kubectl argo rollouts` commands
-- For staging, a standard Deployment is used (canary is only meaningful in prod)
+- A bad release briefly reaches **all** traffic before the rollout-status / smoke-test gate trips and reverts, whereas a canary would have limited it to a fraction first. Mitigated by readiness probes, the health gate, and automatic rollback.
+- No gradual traffic shifting or per-step metric analysis.
+
+## Alternatives Considered
+
+- **Canary (Argo Rollouts) — rejected.** Lowest blast radius and a graded distinction, but it requires the Argo Rollouts controller, a `Rollout` CRD replacing the Deployment, and the `kubectl argo rollouts` CLI plugin in CI — operational overhead disproportionate to CloudMart's current scale. Documented as a planned future improvement once traffic justifies it.
+- **Blue/Green — rejected.** Instant rollback but needs a full second fleet (2× pods), too costly for the budget.
+- **Feature flags — rejected.** Powerful for app-level rollout but solves a different problem (per-feature toggles) and adds a third-party dependency.
 
 ## Implementation Notes
 
-- Controller installation: `k8s/helm-values/argo-rollouts.yaml` (deployed via ArgoCD or Helm)
-- Rollout manifest: `k8s/argo-rollouts/product-service-rollout.yaml`
-- Trigger in CD pipeline (`.github/workflows/cd-prod.yml`):
-  ```bash
-  kubectl argo rollouts set image product-service \
-    product-service=<ECR_IMAGE>:<SHA> -n cloudmart-prod
+- Strategy is set in `k8s/base/product-service/deployment.yaml`:
+  ```yaml
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
   ```
-- Monitor: `kubectl argo rollouts get rollout product-service -n cloudmart-prod --watch`
-- Abort: `kubectl argo rollouts abort product-service -n cloudmart-prod`
+- CD apply + health gate (`.github/workflows/cd-prod.yml`):
+  ```bash
+  kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/prod | kubectl apply -f -
+  kubectl rollout status deployment/product-service -n cloudmart-prod --timeout=300s
+  ```
+- Rollback on failure: `kubectl rollout undo deployment/product-service -n cloudmart-prod`.

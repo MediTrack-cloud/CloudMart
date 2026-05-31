@@ -1,0 +1,15 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-SEC-02  Per-service IRSA role bindings
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   kubectl get sa -n cloudmart-prod -o custom-columns='SERVICEACCOUNT:.metadata.name,IRSA_ROLE_ARN:.metadata.annotations.eks\.amazonaws\.com/role-arn'
+#
+# Captured: 2026-05-31 16:43:38Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
+SERVICEACCOUNT            IRSA_ROLE_ARN
+default                   <none>
+notification-service-sa   arn:aws:iam::898865655202:role/cloudmart-notification-service-role-prod
+order-service-sa          arn:aws:iam::898865655202:role/cloudmart-order-service-role-prod
+product-service-sa        arn:aws:iam::898865655202:role/cloudmart-product-service-role-prod
+user-service-sa           arn:aws:iam::898865655202:role/cloudmart-user-service-role-prod
