@@ -93,12 +93,11 @@ if aws eks describe-cluster --name "$CLUSTER" --region "$AWS_REGION" &>/dev/null
   helm uninstall external-secrets             -n external-secrets --wait 2>/dev/null || true
   helm uninstall keda                         -n keda          --wait 2>/dev/null || true
   helm uninstall kyverno                      -n kyverno       --wait 2>/dev/null || true
-  helm uninstall argo-rollouts                -n argo-rollouts --wait 2>/dev/null || true
   helm uninstall velero                       -n velero        --wait 2>/dev/null || true
 
   # 3e — Remove leftover add-on namespaces
   log "Deleting add-on namespaces …"
-  kubectl delete namespace external-secrets keda kyverno argo-rollouts velero \
+  kubectl delete namespace external-secrets keda kyverno velero \
     --ignore-not-found=true --wait=false 2>/dev/null || true
 
   # 3f — Remove Kyverno CRDs, KEDA CRDs (they block terraform destroy of node groups)

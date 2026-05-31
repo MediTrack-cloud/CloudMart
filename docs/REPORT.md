@@ -10,7 +10,7 @@
 |--------|------|-----------------------|
 | Madhura Jayashanka | Platform / DevOps | Environment roots, CI/CD pipelines, monitoring & alarms, budgets, Velero/DR, cost & DR docs |
 | Dilshan Prasanna Allepola | Core Infrastructure | VPC networking and managed-data modules (RDS, DynamoDB, SQS, S3, KMS, Route 53) |
-| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, External Secrets, ArgoCD, Kyverno, EKS/ECR |
+| Asela Maduwantha | Kubernetes & Delivery | K8s base manifests, NetworkPolicies, Kustomize overlays, External Secrets, Kyverno, EKS/ECR |
 | Akhila Sanjeewa | Application & Helm | Microservice source (product/order/user/notification), Helm charts and values files |
 | Himasha Kodikara | Security & Frontend | IAM/IRSA workload identity, secrets integration, frontend SPA and cross-service wiring |
 
@@ -28,7 +28,7 @@ CloudMart has been re-platformed from a single-VM monolith into **five container
 - **Three-tier VPC** (`10.0.0.0/16`) across 2 AZs: public, private-app, private-data — databases have *no* route to the internet.
 - **Per-service least-privilege IAM via IRSA** — each pod assumes only the permissions its job requires (e.g. product-service can only read/write its DynamoDB table).
 - **Defence in depth** — WAF on the ALB, default-deny NetworkPolicies, Kyverno admission control, KMS encryption at rest, TLS in transit, GuardDuty threat detection.
-- **Progressive delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, Argo Rollouts canary, smoke tests and automatic rollback.
+- **Automated delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, health-gated rolling updates, smoke tests and automatic rollback.
 
 **Outcome metrics.**
 - **Cost:** ~**\$401/month** production, ~**\$253/month** staging on-demand; **\$40.10 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$621/yr (37%)** on compute.
@@ -68,14 +68,14 @@ All five services run as Deployments in namespace **`cloudmart-prod`** (and **`c
 | Service | Replicas (prod) | Service type | Autoscaling |
 |---------|-----------------|--------------|-------------|
 | frontend (React/Nginx) | 2 | ClusterIP :80 (via Ingress/ALB) | — |
-| product-service (Flask) | 2 | ClusterIP :8001 | **HPA 60% CPU 2→6**; Argo canary |
+| product-service (Flask) | 2 | ClusterIP :8001 | **HPA 60% CPU 2→6** |
 | order-service (Express) | 2 | ClusterIP :8002 | **HPA 60% CPU 2→6** |
 | user-service (Flask) | 2 | ClusterIP :8003 | — |
 | notification-service (Node) | 1 | no Service (consumer) | **KEDA on SQS depth** |
 
 Every container declares **resource requests/limits**, **liveness + readiness probes**, a **rolling strategy `maxSurge:1 / maxUnavailable:0`**, a non-root `securityContext` (`readOnlyRootFilesystem`, dropped capabilities), and a **PodDisruptionBudget (minAvailable:1)**. The **Cluster Autoscaler** adds nodes (2→6) when pods cannot schedule; the **Metrics Server** feeds the HPAs. The **Ingress** uses the AWS Load Balancer Controller with ALB annotations (TLS 1.3 policy, WAF ACL attachment, `/health` health check).
 
-**Technology choices justified:** EKS managed node group on `m7i-flex.large` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); Argo Rollouts canary for the highest-traffic product-service (ADR-003).
+**Technology choices justified:** EKS managed node group on `m7i-flex.large` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); health-gated rolling update for product-service (ADR-003).
 
 ---
 
@@ -147,16 +147,16 @@ The **EKS node role carries no application data permissions** — only `WorkerNo
 
 ### 4.3 CD pipelines
 - **Staging** (`cd-staging.yml`) on merge to `develop`: kustomize image tag → apply `overlays/staging` → wait for rollout → smoke tests.
-- **Production** (`cd-prod.yml`) on merge to `main`: **manual approval gate** (GitHub Environment reviewers) → **pre-deploy Velero backup** → image tag bump → **Argo Rollouts canary** for product-service (20→40→100 %, **auto-abort if error rate > 1 %** via a CloudWatch AnalysisTemplate) → rolling update for the rest → **smoke tests** → **automatic rollback on failure**.
+- **Production** (`cd-prod.yml`) on merge to `main`: **manual approval gate** (GitHub Environment reviewers) → **pre-deploy Velero backup** → image tag bump → **rolling update** of all services (`maxSurge:1 / maxUnavailable:0`) gated on `kubectl rollout status` → **smoke tests** → **automatic rollback (`kubectl rollout undo`) on failure**.
 
 ### 4.4 Deployment strategy rationale
-Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploys. The product-service (highest read volume) additionally uses a **canary** so a bad release reaches only 20 % of traffic and is automatically reverted before full promotion (ADR-003).
+Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploys: new pods must pass readiness probes before old ones are retired, the pipeline gates on `kubectl rollout status`, and any failure triggers an automatic `kubectl rollout undo` (ADR-003).
 
 ### 4.5 Infrastructure as Code
 - All cloud resources are Terraform, organised as reusable modules (`vpc, eks, rds, dynamodb, sqs, ecr, iam, kms, s3, monitoring, security, waf, budgets, route53`) consumed by per-environment roots (`environments/prod`, `environments/staging`).
 - **Remote state** in S3 with **DynamoDB lock table** (bootstrapped separately).
 - Variables are parameterised per environment (instance class, NAT count, Multi-AZ, node counts, budget).
-- Kubernetes is managed with **Kustomize base + overlays** and **Helm charts** (per-service charts + an umbrella chart with staging/prod values); **ArgoCD** Applications provide optional GitOps sync.
+- Kubernetes is managed with **Kustomize base + overlays** and **Helm charts** (per-service charts + an umbrella chart with staging/prod values), applied by the CD pipeline via `kubectl`.
 
 ---
 
@@ -239,7 +239,7 @@ Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10
 
 **ADR-002 — user-service database (Accepted).** Compared managed PostgreSQL vs DynamoDB vs Aurora Serverless vs self-managed. Chose **RDS PostgreSQL db.t3.micro/small**: relational auth data (unique email, profile schema) needs strong consistency and joins; managed backups/PITR satisfy DR; ~\$13–55/mo. DynamoDB rejected (poor fit for relational queries); Aurora rejected (cost/overkill).
 
-**ADR-003 — product-service deployment strategy (Accepted).** Compared rolling / blue-green / canary. Chose **Argo Rollouts canary** (20→40→100 %) with a CloudWatch analysis gate that **aborts if error rate > 1 %**. Low blast radius and cheap (+1–2 pods) vs blue-green's 2× fleet; automated rollback suits the team's maturity.
+**ADR-003 — product-service deployment strategy (Accepted).** Compared rolling / blue-green / canary. Chose a **health-gated rolling update** (`maxSurge:1 / maxUnavailable:0`): zero capacity loss, no extra fleet cost (vs blue-green's 2× pods), readiness-probe + `rollout status` gating, and automatic `rollout undo` on failure. Canary (Argo Rollouts) was rejected as operational overhead disproportionate to CloudMart's current scale and team maturity.
 
 ---
 
@@ -247,9 +247,9 @@ Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10
 
 **What worked well.** Treating *everything* as code made environments reproducible and the viva demo deterministic — `deploy.sh`/`destroy.sh` wrap the full lifecycle. IRSA gave genuinely least-privilege identity with no secret sprawl. The Trivy + Kyverno + NetworkPolicy layers caught issues at build, admission and runtime respectively.
 
-**What we'd do differently.** We would adopt GitOps (ArgoCD) as the *primary* deploy path from day one rather than an option alongside `kubectl apply`, and add contract tests between services to catch breaking API changes before the canary stage. We'd also right-size the NAT strategy earlier — interface endpoints and a single NAT in non-prod materially cut spend.
+**What we'd do differently.** We would add contract tests between services to catch breaking API changes before deploy, and introduce progressive delivery (canary) once traffic volume justifies the extra operational overhead. We'd also right-size the NAT strategy earlier — interface endpoints and a single NAT in non-prod materially cut spend.
 
-**Industry case study.** Our canary + automated-rollback design mirrors the post-incident practices popularised after large-scale outages such as the 2017 AWS S3 us-east-1 event and Knight Capital's 2012 deployment failure — both reinforce that *progressive, automatically-reversible* deploys with health gates are the difference between a contained blip and a company-level incident. CloudMart's 1 %-error abort gate is a direct application of that lesson.
+**Industry case study.** Knight Capital's 2012 deployment failure — a bad release rolled out fleet-wide with no automated rollback, losing ~$440M in 45 minutes — directly motivates our deployment design. CloudMart's **health-gated rolling update with automatic `rollout undo`** means a bad release is caught by readiness/`rollout status` gates and reverted automatically rather than left serving traffic. The 2017 AWS S3 us-east-1 outage reinforces the same lesson: *automatically-reversible, health-checked* deploys are the difference between a contained blip and a company-level incident.
 
 ---
 
@@ -315,7 +315,6 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | Health-gated rolling deploy | M | ✅ | rollout status waits |
 | Manual approval gate | R | ✅ | `environment: production` |
 | Post-deploy smoke test | R | ✅ | cd smoke-test steps |
-| Canary w/ 1% error gate | D | ✅ | Argo Rollout + AnalysisTemplate (`>=0.99`) |
 
 ### 3.6 Observability
 | Req | Lvl | Status | Evidence |
@@ -334,7 +333,6 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | Remote state + locking | M | ✅ | `infra/bootstrap` |
 | Env-parameterised variables | M | ✅ | prod/staging tfvars |
 | Helm charts | R | ✅ | `k8s/helm` |
-| GitOps (ArgoCD) | D | ✅ | `k8s/argocd` |
 
 ### 3.8 Cost
 | Req | Lvl | Status | Evidence |
