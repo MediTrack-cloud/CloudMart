@@ -1,0 +1,20 @@
+# AWS Load Balancer Controller Helm values
+# Install: helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+#            -n kube-system -f k8s/helm-values/aws-load-balancer-controller.yaml
+clusterName: cloudmart-staging
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-lb-controller-role-staging
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

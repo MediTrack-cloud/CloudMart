@@ -1,0 +1,22 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cloudmart-notification-secrets
+  namespace: cloudmart-prod
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: ClusterSecretStore
+  target:
+    name: cloudmart-notification-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: SQS_QUEUE_URL
+      remoteRef:
+        key: cloudmart/notification-service/__ENV__
+        property: SQS_QUEUE_URL
+    - secretKey: FROM_EMAIL
+      remoteRef:
+        key: cloudmart/notification-service/__ENV__
+        property: FROM_EMAIL

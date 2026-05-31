@@ -1,0 +1,29 @@
+replicaCount: 2
+image:
+  repository: frontend
+  pullPolicy: IfNotPresent
+  tag: ""
+serviceAccount:
+  name: frontend-sa
+  annotations: {}
+service:
+  type: ClusterIP
+  port: 80
+resources:
+  requests: { cpu: 50m,  memory: 64Mi }
+  limits:   { cpu: 200m, memory: 128Mi }
+hpa:
+  enabled: false
+pdb:
+  enabled: true
+  minAvailable: 1
+ingress:
+  enabled: true
+  host: cloudmart.example
+  certificateArn: ""
+  wafAclArn: ""
+env: {}
+configMapRef: cloudmart-config
+nodeSelector: {}
+tolerations: []
+affinity: {}

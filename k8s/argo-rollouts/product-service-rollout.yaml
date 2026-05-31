@@ -1,0 +1,130 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: product-service
+  namespace: cloudmart-prod
+  labels:
+    app: product-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      serviceAccountName: product-service-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: product-service
+          image: ACCOUNT_ID.dkr.ecr.__REGION__.amazonaws.com/cloudmart/product-service:1.0.0
+          ports:
+            - containerPort: 8001
+          env:
+            - name: PORT
+              value: "8001"
+            - name: STORE_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: PRODUCT_STORE_BACKEND
+            - name: DYNAMODB_TABLE
+              valueFrom:
+                secretKeyRef:
+                  name: cloudmart-product-secrets
+                  key: DYNAMODB_TABLE
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: cloudmart-config
+                  key: AWS_REGION
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+  strategy:
+    canary:
+      # Canary steps: 20% → pause 1m → 40% → pause 1m → promote to 100%
+      steps:
+        - setWeight: 20
+        - pause:
+            duration: 1m
+        - setWeight: 40
+        - pause:
+            duration: 1m
+        - setWeight: 100
+      # Optional analysis to auto-promote/abort based on error rate
+      analysis:
+        startingStep: 1
+        templates:
+          - templateName: product-service-success-rate
+        args:
+          - name: service-name
+            value: product-service
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: product-service-success-rate
+  namespace: cloudmart-prod
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: success-rate
+      interval: 30s
+      count: 3
+      successCondition: result[0] >= 0.99
+      failureLimit: 1
+      provider:
+        cloudWatch:
+          interval: 30s
+          metricDataQueries:
+            - id: errors
+              metricStat:
+                metric:
+                  namespace: AWS/ApplicationELB
+                  metricName: HTTPCode_Target_5XX_Count
+                period: 30
+                stat: Sum
+            - id: requests
+              metricStat:
+                metric:
+                  namespace: AWS/ApplicationELB
+                  metricName: RequestCount
+                period: 30
+                stat: Sum
+            - id: successRate
+              expression: "1 - (errors / MAX([errors, requests]))"
+              returnData: true

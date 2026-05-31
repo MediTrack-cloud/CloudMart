@@ -1,0 +1,31 @@
+# user-service: accept from frontend; can call RDS and Secrets Manager
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-user-service-ingress
+  namespace: cloudmart-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: user-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - port: 8003
+  egress:
+    # RDS PostgreSQL
+    - ports:
+        - port: 5432
+    # Secrets Manager (HTTPS via VPC endpoint)
+    - ports:
+        - port: 443
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP

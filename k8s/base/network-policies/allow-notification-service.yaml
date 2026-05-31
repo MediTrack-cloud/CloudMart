@@ -1,0 +1,22 @@
+# notification-service: no inbound HTTP; egress to SQS and SES (both HTTPS/443)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-notification-service-egress
+  namespace: cloudmart-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: notification-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []          # no inbound HTTP from other services
+  egress:
+    # AWS SQS + SES (HTTPS)
+    - ports:
+        - port: 443
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP

@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-ecr-images-only
+  annotations:
+    policies.kyverno.io/title: Restrict Images to ECR Only
+    policies.kyverno.io/description: >
+      All container images must be pulled from the approved ECR registry.
+      This prevents supply-chain attacks from public Docker Hub images.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-ecr-registry
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [cloudmart-prod, cloudmart-staging]
+      validate:
+        message: >
+          Container images must be pulled from the ECR registry
+          (*.dkr.ecr.*.amazonaws.com). Public images are not allowed.
+        pattern:
+          spec:
+            containers:
+              - image: "*.dkr.ecr.*.amazonaws.com/*"
+            =(initContainers):
+              - image: "*.dkr.ecr.*.amazonaws.com/*"

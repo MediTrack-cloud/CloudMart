@@ -1,66 +1,86 @@
 /**
  * CloudMart Notification Service
- * Consumes order events from a message queue and sends email notifications.
+ * Consumes order events from Amazon SQS and sends email via Amazon SES.
  *
- * This service has NO inbound HTTP traffic from other services (except health checks).
- * It polls a message queue for ORDER_CREATED events and sends confirmation emails.
+ * This service has NO inbound HTTP traffic from other services (only health checks).
  *
  * Queue Backend:
- *   - Default: Polls the order-service /events endpoint (for local dev)
- *   - Cloud:   Set QUEUE_BACKEND=sqs|pubsub|servicebus to poll a real queue
+ *   - Default: Polls order-service /events endpoint (local dev)
+ *   - Cloud:   Set QUEUE_BACKEND=sqs (requires IRSA with SQS receive + SES send)
  *
  * Email Backend:
- *   - Default: Console logging (for local dev)
- *   - Cloud:   Set EMAIL_BACKEND=ses|sendgrid to send real emails
+ *   - Default: Console logging (local dev)
+ *   - Cloud:   Set EMAIL_BACKEND=ses (requires SES verified sender identity)
  */
 
 const express = require('express');
 const morgan = require('morgan');
 const axios = require('axios');
 
+// X-Ray tracing (graceful no-op outside AWS)
+let AWSXRay;
+try {
+  AWSXRay = require('aws-xray-sdk');
+  AWSXRay.config([AWSXRay.plugins.ECSPlugin]);
+  console.log('[notification-service] AWS X-Ray tracing enabled');
+} catch (_) {
+  console.log('[notification-service] AWS X-Ray SDK not available — tracing disabled');
+}
+
 const app = express();
 const PORT = process.env.PORT || 8004;
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://order-service:8002';
+const RECIPIENT_OVERRIDE = process.env.DEMO_RECIPIENT_EMAIL || '';
 
-// Service URLs
-const ORDER_SERVICE_URL =
-  process.env.ORDER_SERVICE_URL || 'http://order-service:8002';
-
-// Track processed events to avoid duplicates
 const processedEvents = new Set();
 const notificationLog = [];
 
 // ---------------------------------------------------------------------------
+// SQS client (lazy-initialised)
+// ---------------------------------------------------------------------------
+let _sqsClient = null;
+let _sesClient = null;
+
+function getSQSClient() {
+  if (!_sqsClient) {
+    const { SQSClient } = require('@aws-sdk/client-sqs');
+    _sqsClient = new SQSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  }
+  return _sqsClient;
+}
+
+function getSESClient() {
+  if (!_sesClient) {
+    const { SESClient } = require('@aws-sdk/client-ses');
+    _sesClient = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  }
+  return _sesClient;
+}
+
+// ---------------------------------------------------------------------------
 // Email sending abstraction
 // ---------------------------------------------------------------------------
-
 async function sendEmail(to, subject, body) {
   const backend = (process.env.EMAIL_BACKEND || 'console').toLowerCase();
-
   const email = { to, subject, body, sentAt: new Date().toISOString() };
 
   if (backend === 'ses') {
-    // TODO: AWS SES — use @aws-sdk/client-ses
-    // const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
-    // const client = new SESClient({ region: process.env.AWS_REGION });
-    // await client.send(new SendEmailCommand({
-    //   Source: process.env.FROM_EMAIL,
-    //   Destination: { ToAddresses: [to] },
-    //   Message: {
-    //     Subject: { Data: subject },
-    //     Body: { Text: { Data: body } },
-    //   },
-    // }));
-    console.log(`[SES] Would send email to ${to}: ${subject}`);
-  } else if (backend === 'sendgrid') {
-    // TODO: SendGrid (GCP / Azure) — use @sendgrid/mail
-    // const sgMail = require('@sendgrid/mail');
-    // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    // await sgMail.send({ to, from: process.env.FROM_EMAIL, subject, text: body });
-    console.log(`[SendGrid] Would send email to ${to}: ${subject}`);
+    const { SendEmailCommand } = require('@aws-sdk/client-ses');
+    const fromEmail = process.env.FROM_EMAIL;
+    if (!fromEmail) throw new Error('FROM_EMAIL env var is required when EMAIL_BACKEND=ses');
+
+    await getSESClient().send(new SendEmailCommand({
+      Source: fromEmail,
+      Destination: { ToAddresses: [to] },
+      Message: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: { Text: { Data: body, Charset: 'UTF-8' } },
+      },
+    }));
+    console.log(`[SES] Email sent to ${to}: ${subject}`);
   } else {
-    // Console mode — just log the email
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`📧 EMAIL NOTIFICATION`);
+    console.log(`EMAIL NOTIFICATION`);
     console.log(`${'='.repeat(60)}`);
     console.log(`To:      ${to}`);
     console.log(`Subject: ${subject}`);
@@ -75,13 +95,11 @@ async function sendEmail(to, subject, body) {
 // ---------------------------------------------------------------------------
 // Event processing
 // ---------------------------------------------------------------------------
-
 function formatCurrency(amount) {
   return `$${Number(amount).toFixed(2)}`;
 }
 
 async function processOrderEvent(event) {
-  // Skip already-processed events
   const eventKey = `${event.type}-${event.orderId}-${event.timestamp}`;
   if (processedEvents.has(eventKey)) return;
   processedEvents.add(eventKey);
@@ -107,13 +125,10 @@ async function processOrderEvent(event) {
       `Thank you for shopping with CloudMart!`,
     ].join('\n');
 
-    // In a real system, we'd look up the user's email from user-service
-    const recipientEmail = `${event.userId}@cloudmart.example`;
+    const recipientEmail = RECIPIENT_OVERRIDE || `${event.userId}@cloudmart.example`;
     await sendEmail(recipientEmail, subject, body);
+    console.log(`[Notification] Processed ORDER_CREATED for ${event.orderId} — ${formatCurrency(event.total)}`);
 
-    console.log(
-      `[Notification] Processed ORDER_CREATED for ${event.orderId} — ${formatCurrency(event.total)}`
-    );
   } else if (event.type === 'ORDER_STATUS_CHANGED') {
     const subject = `CloudMart Order ${event.orderId} — Status Update`;
     const body = [
@@ -124,27 +139,59 @@ async function processOrderEvent(event) {
       `Thank you for shopping with CloudMart!`,
     ].join('\n');
 
-    const recipientEmail = `${event.userId}@cloudmart.example`;
+    const recipientEmail = RECIPIENT_OVERRIDE || `${event.userId}@cloudmart.example`;
     await sendEmail(recipientEmail, subject, body);
-
-    console.log(
-      `[Notification] Processed ORDER_STATUS_CHANGED for ${event.orderId} → ${event.newStatus}`
-    );
+    console.log(`[Notification] Processed ORDER_STATUS_CHANGED for ${event.orderId} → ${event.newStatus}`);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Queue polling (local dev mode — polls order-service /events endpoint)
+// SQS long-polling (AWS cloud mode)
 // ---------------------------------------------------------------------------
+async function pollSQS() {
+  const { ReceiveMessageCommand, DeleteMessageCommand } = require('@aws-sdk/client-sqs');
+  const queueUrl = process.env.SQS_QUEUE_URL;
+  if (!queueUrl) {
+    console.error('[SQS] SQS_QUEUE_URL not set — skipping poll');
+    return;
+  }
 
+  try {
+    const response = await getSQSClient().send(new ReceiveMessageCommand({
+      QueueUrl: queueUrl,
+      MaxNumberOfMessages: 10,
+      WaitTimeSeconds: 20,        // long polling — reduces cost vs. tight loop
+      VisibilityTimeout: 30,
+    }));
+
+    for (const msg of response.Messages || []) {
+      try {
+        const event = JSON.parse(msg.Body);
+        await processOrderEvent(event);
+        // Delete only after successful processing
+        await getSQSClient().send(new DeleteMessageCommand({
+          QueueUrl: queueUrl,
+          ReceiptHandle: msg.ReceiptHandle,
+        }));
+      } catch (err) {
+        console.error('[SQS] Failed to process message:', err.message);
+        // Message will become visible again after VisibilityTimeout
+      }
+    }
+  } catch (err) {
+    console.error('[SQS] Poll error:', err.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Order-service event polling (local dev mode)
+// ---------------------------------------------------------------------------
 let lastEventCount = 0;
 
 async function pollOrderServiceEvents() {
   try {
     const res = await axios.get(`${ORDER_SERVICE_URL}/events`, { timeout: 3000 });
     const events = res.data.events || [];
-
-    // Process only new events
     if (events.length > lastEventCount) {
       const newEvents = events.slice(lastEventCount);
       for (const event of newEvents) {
@@ -157,59 +204,30 @@ async function pollOrderServiceEvents() {
   }
 }
 
-async function pollCloudQueue() {
-  const backend = (process.env.QUEUE_BACKEND || 'memory').toLowerCase();
-
-  if (backend === 'sqs') {
-    // TODO: AWS SQS — use @aws-sdk/client-sqs
-    // const { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } = require('@aws-sdk/client-sqs');
-    // const client = new SQSClient({ region: process.env.AWS_REGION });
-    // const response = await client.send(new ReceiveMessageCommand({
-    //   QueueUrl: process.env.SQS_QUEUE_URL,
-    //   MaxNumberOfMessages: 10,
-    //   WaitTimeSeconds: 20,
-    // }));
-    // for (const msg of response.Messages || []) {
-    //   await processOrderEvent(JSON.parse(msg.Body));
-    //   await client.send(new DeleteMessageCommand({
-    //     QueueUrl: process.env.SQS_QUEUE_URL,
-    //     ReceiptHandle: msg.ReceiptHandle,
-    //   }));
-    // }
-    console.log('[SQS] Would poll for messages...');
-  } else if (backend === 'pubsub') {
-    // TODO: GCP Pub/Sub — use @google-cloud/pubsub
-    // Pub/Sub uses push or streaming pull — implement subscription handler
-    console.log('[Pub/Sub] Would subscribe to topic...');
-  } else if (backend === 'servicebus') {
-    // TODO: Azure Service Bus — use @azure/service-bus
-    // const { ServiceBusClient } = require('@azure/service-bus');
-    // const client = new ServiceBusClient(process.env.SERVICEBUS_CONNECTION);
-    // const receiver = client.createReceiver(process.env.SERVICEBUS_QUEUE);
-    // const messages = await receiver.receiveMessages(10, { maxWaitTimeInMs: 20000 });
-    // for (const msg of messages) {
-    //   await processOrderEvent(msg.body);
-    //   await receiver.completeMessage(msg);
-    // }
-    console.log('[Service Bus] Would poll for messages...');
-  } else {
-    // In-memory mode — poll order-service directly
-    await pollOrderServiceEvents();
-  }
-}
-
-// Start polling loop
+// ---------------------------------------------------------------------------
+// Polling loop
+// ---------------------------------------------------------------------------
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '5000', 10);
 
 function startPolling() {
-  console.log(`[Notification] Starting queue polling (every ${POLL_INTERVAL_MS}ms)`);
-  setInterval(pollCloudQueue, POLL_INTERVAL_MS);
+  const backend = (process.env.QUEUE_BACKEND || 'memory').toLowerCase();
+  console.log(`[Notification] Starting queue polling every ${POLL_INTERVAL_MS}ms (backend: ${backend})`);
+
+  if (backend === 'sqs') {
+    // SQS uses long-polling (20s wait) so we loop immediately after each response
+    const loop = async () => {
+      await pollSQS();
+      setTimeout(loop, 1000); // minimal delay between long-poll cycles
+    };
+    loop();
+  } else {
+    setInterval(pollOrderServiceEvents, POLL_INTERVAL_MS);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// HTTP routes (health check only — this service has no inbound API traffic)
+// HTTP routes (health check only)
 // ---------------------------------------------------------------------------
-
 app.use(morgan('combined'));
 
 app.get('/health', (req, res) => {
@@ -220,15 +238,13 @@ app.get('/ready', (req, res) => {
   res.json({ status: 'ready', service: 'notification-service' });
 });
 
-// View notification log (for demo / debugging)
 app.get('/notifications', (req, res) => {
   res.json({ notifications: notificationLog, count: notificationLog.length });
 });
 
 // ---------------------------------------------------------------------------
-// Start server + polling
+// Start
 // ---------------------------------------------------------------------------
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[notification-service] Health endpoint on port ${PORT}`);
   console.log(`[notification-service] Queue backend: ${process.env.QUEUE_BACKEND || 'memory'}`);

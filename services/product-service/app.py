@@ -4,14 +4,15 @@ Manages product catalogue: CRUD operations, search, category filtering.
 
 Data Store:
   - Default: In-memory dictionary (for local dev / Docker Compose)
-  - Cloud:   Set STORE_BACKEND=dynamodb|firestore|cosmosdb via env var
-             to use a managed NoSQL database (requires workload identity / credentials)
+  - Cloud:   Set STORE_BACKEND=dynamodb via env var
+             to use Amazon DynamoDB (requires IRSA / workload identity)
 """
 
 import os
 import uuid
 import logging
 from datetime import datetime
+from decimal import Decimal
 from flask import Flask, jsonify, request, abort
 
 # ---------------------------------------------------------------------------
@@ -26,11 +27,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("product-service")
 
-# ---------------------------------------------------------------------------
-# Data store abstraction
-# ---------------------------------------------------------------------------
+# X-Ray tracing (no-op when not running on AWS)
+try:
+    from aws_xray_sdk.core import xray_recorder, patch_all
+    from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
+    xray_recorder.configure(service="product-service")
+    XRayMiddleware(app, xray_recorder)
+    patch_all()
+    logger.info("AWS X-Ray tracing enabled")
+except Exception:
+    logger.info("AWS X-Ray SDK not available — tracing disabled")
 
+# ---------------------------------------------------------------------------
 # Seed data
+# ---------------------------------------------------------------------------
 SEED_PRODUCTS = [
     {
         "id": "prod-001",
@@ -95,9 +105,25 @@ SEED_PRODUCTS = [
 ]
 
 
-class InMemoryStore:
-    """Simple in-memory product store for local development."""
+# ---------------------------------------------------------------------------
+# Helper: normalise DynamoDB Decimal types to Python float/int
+# ---------------------------------------------------------------------------
+def _deserialize(item):
+    if item is None:
+        return None
+    result = {}
+    for k, v in item.items():
+        if isinstance(v, Decimal):
+            result[k] = int(v) if v == v.to_integral_value() else float(v)
+        else:
+            result[k] = v
+    return result
 
+
+# ---------------------------------------------------------------------------
+# In-memory store (local dev / Docker Compose)
+# ---------------------------------------------------------------------------
+class InMemoryStore:
     def __init__(self):
         self.products = {p["id"]: dict(p) for p in SEED_PRODUCTS}
 
@@ -108,8 +134,7 @@ class InMemoryStore:
         if search:
             q = search.lower()
             results = [
-                p
-                for p in results
+                p for p in results
                 if q in p["name"].lower() or q in p["description"].lower()
             ]
         return results
@@ -160,73 +185,141 @@ class InMemoryStore:
 
 
 # ---------------------------------------------------------------------------
-# Cloud store adapters (students implement these for the assignment)
+# DynamoDB store (AWS production)
 # ---------------------------------------------------------------------------
-
 class DynamoDBStore:
     """
     AWS DynamoDB adapter.
-
-    To use: set STORE_BACKEND=dynamodb and DYNAMODB_TABLE=<table-name>
-
-    Students: implement each method using boto3.
-    Requires IRSA / workload identity for credentials.
+    Requires: STORE_BACKEND=dynamodb, DYNAMODB_TABLE=<table-name>, AWS_REGION
+    Credentials provided automatically via IRSA (IAM Roles for Service Accounts).
     """
 
     def __init__(self):
-        # TODO: import boto3; create dynamodb resource
-        # self.table = boto3.resource('dynamodb').Table(os.environ['DYNAMODB_TABLE'])
-        raise NotImplementedError(
-            "DynamoDB store not implemented yet. "
-            "See the assignment brief Section 3.3 for guidance."
+        import boto3
+        from boto3.dynamodb.conditions import Attr
+        self._Attr = Attr
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        table_name = os.environ["DYNAMODB_TABLE"]
+        self.table = boto3.resource("dynamodb", region_name=region).Table(table_name)
+        logger.info(f"DynamoDB store initialised: table={table_name} region={region}")
+
+    def get_all(self, category=None, search=None):
+        kwargs = {}
+        expressions = []
+        if category:
+            expressions.append(self._Attr("category").eq(category))
+        if search:
+            q = search.lower()
+            expressions.append(
+                self._Attr("name").contains(q) | self._Attr("description").contains(q)
+            )
+        if expressions:
+            from functools import reduce
+            import operator
+            kwargs["FilterExpression"] = reduce(operator.and_, expressions)
+
+        items = []
+        resp = self.table.scan(**kwargs)
+        items.extend(resp.get("Items", []))
+        while "LastEvaluatedKey" in resp:
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+            resp = self.table.scan(**kwargs)
+            items.extend(resp.get("Items", []))
+        return [_deserialize(i) for i in items]
+
+    def get_by_id(self, product_id):
+        resp = self.table.get_item(Key={"id": product_id})
+        return _deserialize(resp.get("Item"))
+
+    def create(self, data):
+        product_id = f"prod-{uuid.uuid4().hex[:6]}"
+        product = {
+            "id": product_id,
+            "name": data["name"],
+            "description": data.get("description", ""),
+            "price": Decimal(str(data["price"])),
+            "category": data.get("category", "general"),
+            "stock": int(data.get("stock", 0)),
+            "imageUrl": data.get("imageUrl", ""),
+            "createdAt": datetime.utcnow().isoformat() + "Z",
+        }
+        self.table.put_item(Item=product)
+        return _deserialize(product)
+
+    def update(self, product_id, data):
+        if not self.get_by_id(product_id):
+            return None
+        update_expr = []
+        expr_values = {}
+        expr_names = {}
+        field_map = {
+            "name": "#nm", "description": "#desc", "price": "#price",
+            "category": "#cat", "stock": "#stk", "imageUrl": "#img",
+        }
+        name_map = {
+            "#nm": "name", "#desc": "description", "#price": "price",
+            "#cat": "category", "#stk": "stock", "#img": "imageUrl",
+        }
+        for key, alias in field_map.items():
+            if key in data:
+                update_expr.append(f"{alias} = :{key}")
+                val = data[key]
+                if key == "price":
+                    val = Decimal(str(val))
+                elif key == "stock":
+                    val = int(val)
+                expr_values[f":{key}"] = val
+                expr_names[alias] = name_map[alias]
+
+        expr_values[":updatedAt"] = datetime.utcnow().isoformat() + "Z"
+        update_expr.append("#upd = :updatedAt")
+        expr_names["#upd"] = "updatedAt"
+
+        resp = self.table.update_item(
+            Key={"id": product_id},
+            UpdateExpression="SET " + ", ".join(update_expr),
+            ExpressionAttributeValues=expr_values,
+            ExpressionAttributeNames=expr_names,
+            ReturnValues="ALL_NEW",
         )
+        return _deserialize(resp.get("Attributes"))
+
+    def delete(self, product_id):
+        if not self.get_by_id(product_id):
+            return False
+        self.table.delete_item(Key={"id": product_id})
+        return True
+
+    def check_stock(self, product_id, quantity):
+        product = self.get_by_id(product_id)
+        if not product:
+            return False
+        return product["stock"] >= quantity
+
+    def decrement_stock(self, product_id, quantity):
+        from boto3.dynamodb.conditions import Attr
+        try:
+            self.table.update_item(
+                Key={"id": product_id},
+                UpdateExpression="SET #stk = #stk - :qty",
+                ConditionExpression=Attr("stock").gte(quantity),
+                ExpressionAttributeNames={"#stk": "stock"},
+                ExpressionAttributeValues={":qty": int(quantity)},
+            )
+            return True
+        except self.table.meta.client.exceptions.ConditionalCheckFailedException:
+            return False
 
 
-class FirestoreStore:
-    """
-    GCP Firestore adapter.
-
-    To use: set STORE_BACKEND=firestore and FIRESTORE_COLLECTION=<collection-name>
-
-    Students: implement each method using google-cloud-firestore.
-    Requires GCP Workload Identity for credentials.
-    """
-
-    def __init__(self):
-        raise NotImplementedError(
-            "Firestore store not implemented yet. "
-            "See the assignment brief Section 3.3 for guidance."
-        )
-
-
-class CosmosDBStore:
-    """
-    Azure Cosmos DB adapter.
-
-    To use: set STORE_BACKEND=cosmosdb and COSMOSDB_ENDPOINT / COSMOSDB_KEY
-
-    Students: implement each method using azure-cosmos.
-    Requires Azure Workload Identity for credentials.
-    """
-
-    def __init__(self):
-        raise NotImplementedError(
-            "Cosmos DB store not implemented yet. "
-            "See the assignment brief Section 3.3 for guidance."
-        )
-
-
+# ---------------------------------------------------------------------------
+# Store factory
+# ---------------------------------------------------------------------------
 def create_store():
     backend = os.environ.get("STORE_BACKEND", "memory").lower()
     if backend == "dynamodb":
         return DynamoDBStore()
-    elif backend == "firestore":
-        return FirestoreStore()
-    elif backend == "cosmosdb":
-        return CosmosDBStore()
-    else:
-        logger.info("Using in-memory product store (set STORE_BACKEND to use cloud DB)")
-        return InMemoryStore()
+    logger.info("Using in-memory product store (set STORE_BACKEND=dynamodb for AWS)")
+    return InMemoryStore()
 
 
 store = create_store()
@@ -238,13 +331,11 @@ store = create_store()
 
 @app.route("/health")
 def health():
-    """Health check endpoint for Kubernetes liveness/readiness probes."""
     return jsonify({"status": "healthy", "service": "product-service"})
 
 
 @app.route("/ready")
 def ready():
-    """Readiness check — verifies the store is accessible."""
     try:
         store.get_all()
         return jsonify({"status": "ready", "service": "product-service"})
@@ -253,11 +344,8 @@ def ready():
 
 
 @app.route("/products", methods=["GET"])
+@app.route("/api/products", methods=["GET"])
 def list_products():
-    """
-    List all products.
-    Query params: ?category=electronics  &search=headphone
-    """
     category = request.args.get("category")
     search = request.args.get("search")
     products = store.get_all(category=category, search=search)
@@ -265,8 +353,8 @@ def list_products():
 
 
 @app.route("/products/<product_id>", methods=["GET"])
+@app.route("/api/products/<product_id>", methods=["GET"])
 def get_product(product_id):
-    """Get a single product by ID."""
     product = store.get_by_id(product_id)
     if not product:
         abort(404, description=f"Product {product_id} not found")
@@ -274,8 +362,8 @@ def get_product(product_id):
 
 
 @app.route("/products", methods=["POST"])
+@app.route("/api/products", methods=["POST"])
 def create_product():
-    """Create a new product."""
     data = request.get_json()
     if not data or "name" not in data or "price" not in data:
         abort(400, description="Missing required fields: name, price")
@@ -285,8 +373,8 @@ def create_product():
 
 
 @app.route("/products/<product_id>", methods=["PUT"])
+@app.route("/api/products/<product_id>", methods=["PUT"])
 def update_product(product_id):
-    """Update an existing product."""
     data = request.get_json()
     if not data:
         abort(400, description="Request body required")
@@ -298,8 +386,8 @@ def update_product(product_id):
 
 
 @app.route("/products/<product_id>", methods=["DELETE"])
+@app.route("/api/products/<product_id>", methods=["DELETE"])
 def delete_product(product_id):
-    """Delete a product."""
     if not store.delete(product_id):
         abort(404, description=f"Product {product_id} not found")
     logger.info(f"Deleted product: {product_id}")
@@ -307,8 +395,8 @@ def delete_product(product_id):
 
 
 @app.route("/products/<product_id>/stock", methods=["GET"])
+@app.route("/api/products/<product_id>/stock", methods=["GET"])
 def check_stock(product_id):
-    """Check stock availability (called by order-service)."""
     product = store.get_by_id(product_id)
     if not product:
         abort(404, description=f"Product {product_id} not found")
@@ -318,8 +406,8 @@ def check_stock(product_id):
 
 
 @app.route("/products/<product_id>/stock/decrement", methods=["POST"])
+@app.route("/api/products/<product_id>/stock/decrement", methods=["POST"])
 def decrement_stock(product_id):
-    """Decrement stock after order placement (called by order-service)."""
     data = request.get_json() or {}
     quantity = int(data.get("quantity", 1))
     if not store.decrement_stock(product_id, quantity):
@@ -329,8 +417,8 @@ def decrement_stock(product_id):
 
 
 @app.route("/categories", methods=["GET"])
+@app.route("/api/categories", methods=["GET"])
 def list_categories():
-    """List all unique product categories."""
     products = store.get_all()
     categories = sorted(set(p["category"] for p in products))
     return jsonify({"categories": categories})

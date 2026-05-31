@@ -1,0 +1,65 @@
+{{- $global := .Values.global | default dict }}
+{{- $env := $global.environment | default "prod" }}
+{{- $ns  := $global.namespace   | default (printf "cloudmart-%s" $env) }}
+{{- $reg := $global.imageRegistry | default (printf "%s.dkr.ecr.%s.amazonaws.com/cloudmart" ($global.awsAccountId | default "") ($global.awsRegion | default "us-east-1")) }}
+{{- $tag := $global.imageTag     | default .Chart.AppVersion }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: {{ $ns }}
+  labels:
+    app: notification-service
+    environment: {{ $env }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: notification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        environment: {{ $env }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: notification-service
+          image: {{ $reg }}/notification-service:{{ $tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # No inbound HTTP port — SQS consumer only
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.configMapRef }}
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          livenessProbe:
+            exec:
+              command: ["node", "-e", "process.exit(0)"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

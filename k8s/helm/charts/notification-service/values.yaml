@@ -1,0 +1,33 @@
+replicaCount: 1
+image:
+  repository: notification-service
+  pullPolicy: IfNotPresent
+  tag: ""
+serviceAccount:
+  name: notification-service-sa
+  annotations: {}
+service:
+  type: ClusterIP
+  port: 8004
+  createService: false
+resources:
+  requests: { cpu: 50m,  memory: 64Mi }
+  limits:   { cpu: 200m, memory: 256Mi }
+hpa:
+  enabled: false
+pdb:
+  enabled: false
+keda:
+  enabled: true
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  sqsQueueLength: 5
+  sqsQueueUrl: ""  # injected from ConfigMap
+  awsRegion: us-east-1
+env:
+  EMAIL_BACKEND: ses
+  AWS_REGION: us-east-1
+configMapRef: cloudmart-config
+nodeSelector: {}
+tolerations: []
+affinity: {}

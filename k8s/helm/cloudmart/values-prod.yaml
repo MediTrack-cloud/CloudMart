@@ -1,0 +1,24 @@
+global:
+  environment: prod
+  namespace: cloudmart-prod
+
+product-service:
+  replicaCount: 2
+  hpa:
+    maxReplicas: 10
+
+order-service:
+  replicaCount: 2
+  hpa:
+    maxReplicas: 10
+
+user-service:
+  replicaCount: 2
+
+notification-service:
+  keda:
+    enabled: true
+    maxReplicaCount: 5
+
+frontend:
+  replicaCount: 2

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudmart-prod
+  labels:
+    app: cloudmart
+    environment: production

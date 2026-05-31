@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloudmart-prod
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/configmap.yaml
+  - ../../base/network-policies/default-deny.yaml
+  - ../../base/network-policies/allow-dns.yaml
+  - ../../base/network-policies/allow-product-service.yaml
+  - ../../base/network-policies/allow-order-service.yaml
+  - ../../base/network-policies/allow-user-service.yaml
+  - ../../base/network-policies/allow-frontend-egress.yaml
+  - ../../base/product-service/serviceaccount.yaml
+  - ../../base/product-service/service.yaml
+  - ../../base/product-service/hpa.yaml
+  - ../../base/product-service/pdb.yaml
+  - ../../base/order-service/serviceaccount.yaml
+  - ../../base/order-service/deployment.yaml
+  - ../../base/order-service/service.yaml
+  - ../../base/order-service/hpa.yaml
+  - ../../base/order-service/pdb.yaml
+  - ../../base/user-service/serviceaccount.yaml
+  - ../../base/user-service/deployment.yaml
+  - ../../base/user-service/service.yaml
+  - ../../base/user-service/pdb.yaml
+  - ../../base/notification-service/serviceaccount.yaml
+  - ../../base/notification-service/deployment.yaml
+  - ../../base/notification-service/service.yaml
+  - ../../base/frontend/deployment.yaml
+  - ../../base/frontend/service.yaml
+  - ../../base/frontend/ingress.yaml
+  - ../../base/frontend/pdb.yaml
+  - ../../external-secrets/cluster-secret-store.yaml
+  - ../../external-secrets/product-service-es.yaml
+  - ../../external-secrets/order-service-es.yaml
+  - ../../external-secrets/user-service-es.yaml
+  - ../../external-secrets/notification-service-es.yaml
+  # product-service uses Argo Rollout (not a standard Deployment) in prod
+  - ../../argo-rollouts/product-service-rollout.yaml
+  # Security policies enforced only in prod
+  - ../../security/kyverno-block-root.yaml
+  - ../../security/kyverno-ecr-only.yaml

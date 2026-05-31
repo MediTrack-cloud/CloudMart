@@ -1,219 +1,146 @@
-# CloudMart — Starter Code
+# CloudMart — Production-Grade Microservices Platform on AWS EKS
 
-**IS 4630 Cloud Infrastructure Management | University of Moratuwa**
+CloudMart is a production-grade e-commerce platform built as five microservices on
+**Amazon EKS**. This repository contains the complete application source, container
+images, Kubernetes manifests, Terraform infrastructure, and CI/CD pipelines for the
+platform across **staging** and **production** environments.
 
-CloudMart is a microservices-based e-commerce platform used as the group assignment project for IS 4630. This repository contains fully working starter code for all five services.
+## Chosen Cloud Provider
 
-## Architecture
+**Amazon Web Services (AWS)** — selected for the maturity of its managed Kubernetes
+(EKS), first-class IRSA workload identity, and the breadth of managed backends the
+services depend on (RDS, DynamoDB, SQS, SES, Secrets Manager, KMS).
+
+| Generic service | AWS service used |
+|-----------------|------------------|
+| Managed Kubernetes | Amazon EKS |
+| Container Registry | Amazon ECR |
+| Relational DB | Amazon RDS (PostgreSQL 15) |
+| NoSQL DB | Amazon DynamoDB |
+| Message Queue | Amazon SQS |
+| Email | Amazon SES |
+| Load Balancer / Ingress | ALB + AWS Load Balancer Controller |
+| Monitoring / Logging | CloudWatch Container Insights + Logs |
+| Threat Detection | Amazon GuardDuty |
+| WAF | AWS WAF v2 |
+| Secrets / Keys | Secrets Manager + KMS |
+| Object Storage | Amazon S3 |
+
+## Architecture Summary
+
+- **Network** — `/16` VPC across 2 AZs, three-tier subnets (public, private-app,
+  private-data), IGW + NAT gateways, per-tier route tables, security groups scoped by
+  least privilege, S3/DynamoDB gateway endpoints, Secrets Manager/ECR interface
+  endpoints, and VPC Flow Logs shipped to CloudWatch.
+- **Compute** — EKS managed node group (m7i-flex.large, IMDSv2 enforced) with Cluster
+  Autoscaler; all five services run 2+ replicas with HPA, PDB, probes, and a rolling
+  strategy of `maxSurge:1 / maxUnavailable:0`.
+- **Security** — per-service IRSA roles (resource-scoped, no node-level data access),
+  default-deny NetworkPolicies with explicit allow rules, KMS encryption at rest, RDS
+  TLS enforced in transit (`rds.force_ssl`), Secrets injected via External Secrets
+  Operator, Kyverno admission policies, WAF on the ALB, and GuardDuty threat detection.
+- **Delivery** — GitHub Actions CI (lint, test, build, Trivy scan, manifest validation)
+  and CD (staging on `develop`, production on `main` with a manual approval gate,
+  pre-deploy Velero backup, smoke tests, and automatic rollback). Argo Rollouts drives a
+  canary for product-service; ArgoCD provides optional GitOps sync.
+- **Observability** — CloudWatch dashboards (CPU/memory, request/error rate, queue
+  depth, DB connections), per-service log groups, a product-service error-rate alarm, a
+  custom order-throughput metric, and X-Ray distributed tracing.
+- **DR** — RDS Multi-AZ + 7-day PITR, DynamoDB PITR, Velero namespace backups, and
+  Route 53 health-check DNS failover to an S3 maintenance page.
+
+The five services and their communication patterns are described in
+[docs/](docs/) and the architecture diagrams (D1–D5) accompanying the written report.
+
+## Repository Structure
 
 ```
-┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Frontend   │────▶│  product-service │     │   user-service   │
-│  (React/Nginx│────▶│  (Flask :8001)   │     │  (Flask :8003)   │
-│   :80/443)   │────▶│                  │     │  JWT + bcrypt    │
-│              │     └──────────────────┘     └──────────────────┘
-│              │────▶┌──────────────────┐
-│              │     │  order-service   │────▶ product-service
-└──────────────┘     │  (Express :8002) │        (stock check)
-                     │                  │
-                     └───────┬──────────┘
-                             │ publishes
-                             ▼
-                     ┌──────────────────┐
-                     │  Message Queue   │
-                     │  (in-memory/SQS/ │
-                     │   Pub-Sub/SB)    │
-                     └───────┬──────────┘
-                             │ consumes
-                             ▼
-                     ┌──────────────────┐
-                     │ notification-svc │
-                     │  (Node.js :8004) │
-                     │  sends emails    │
-                     └──────────────────┘
+CloudMart/
+├── infra/                  # Terraform IaC
+│   ├── bootstrap/          # S3 state bucket + DynamoDB lock table
+│   ├── environments/       # prod/ and staging/ environment roots
+│   └── modules/            # Reusable modules (vpc, eks, rds, iam, monitoring, …)
+├── k8s/                    # Kubernetes manifests (Kustomize base + overlays, Helm charts)
+├── services/               # Microservice source code + Dockerfiles
+├── docs/                   # ADRs, cost analysis, disaster-recovery plan
+├── .github/workflows/      # CI / CD pipelines
+└── docker-compose.yml      # Local development environment
 ```
 
-## Services
+## Prerequisites
 
-| Service | Port | Language | Description |
-|---------|------|----------|-------------|
-| **product-service** | 8001 | Python/Flask | Product catalogue CRUD, search, categories, stock management |
-| **order-service** | 8002 | Node.js/Express | Order creation, status management, publishes events to queue |
-| **user-service** | 8003 | Python/Flask | User registration, JWT authentication, profile management |
-| **notification-service** | 8004 | Node.js | Consumes order events, sends email notifications |
-| **frontend** | 80 | React/Nginx | SPA with product browsing, cart, checkout, order history |
+- AWS account with permissions to create the resources above
+- Terraform ≥ 1.6, AWS CLI v2, kubectl, kustomize, Helm 3, Docker
+- A GitHub repo with the OIDC role + secrets configured (`AWS_ROLE_ARN`, etc.)
 
-## Quick Start (Local Development)
+## Deployment Instructions
 
-### Prerequisites
-
-- Docker Desktop installed and running
-- Git
-
-### Run with Docker Compose
+### 1. Bootstrap remote state
 
 ```bash
-git clone <your-repo-url>
-cd cloudmart-starter
-docker compose up --build
+cd infra/bootstrap
+terraform init && terraform apply      # creates S3 state bucket + DynamoDB lock table
 ```
 
-Open http://localhost:3000 in your browser.
-
-**Demo credentials:** `alice@cloudmart.example` / `password123`
-
-### Test individual services
+### 2. Provision infrastructure (per environment)
 
 ```bash
-# Health checks
-curl http://localhost:8001/health
-curl http://localhost:8002/health
-curl http://localhost:8003/health
-curl http://localhost:8004/health
-
-# List products
-curl http://localhost:8001/products
-
-# Search products
-curl "http://localhost:8001/products?search=headphone"
-
-# Filter by category
-curl "http://localhost:8001/products?category=electronics"
-
-# Register a new user
-curl -X POST http://localhost:8003/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test User","email":"test@example.com","password":"password123"}'
-
-# Login
-curl -X POST http://localhost:8003/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@cloudmart.example","password":"password123"}'
-
-# Create an order (use the token from login response)
-curl -X POST http://localhost:8002/orders \
-  -H "Content-Type: application/json" \
-  -d '{"userId":"user-001","items":[{"productId":"prod-001","quantity":1}]}'
-
-# Check notification log
-curl http://localhost:8004/notifications
+cd infra/environments/prod              # or environments/staging
+source ../../load-env.sh                # maps .env -> TF_VAR_* (emails, region, GitHub org)
+terraform init -backend-config=backend.tf
+terraform plan  -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
 ```
 
-## Cloud Adapter Pattern
+User-specific values (`aws_region`, `owner_email`, `alert_email`, `ses_from_email`,
+`github_org`, `github_repo`) live in **`.env`**, not in the committed `terraform.tfvars`.
+`source ../../load-env.sh` exports them as `TF_VAR_*` for a manual apply; `./deploy.sh -e prod`
+does the same automatically. Set in `.env` before applying:
+- `SES_FROM_EMAIL` / `DEMO_RECIPIENT_EMAIL` — must be **verified** SES identities (sandbox)
+- `ALERT_EMAIL`, `OWNER_EMAIL`, `GITHUB_ORG`
 
-All services use an **adapter pattern** for cloud backends. By default, they run with in-memory data stores (no cloud credentials needed). To connect to cloud-managed services, set the appropriate environment variables:
+Then in `terraform.tfvars` (env infra config) optionally set:
+- `bastion_allowed_cidrs` — your admin/VPN IP (leave `[]` to use SSM Session Manager)
+- `domain_name` for Route 53 DNS failover
 
-### Product Service
+### 3. Configure kubectl and platform add-ons
 
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `STORE_BACKEND` | `memory` (default), `dynamodb`, `firestore`, `cosmosdb` | Data store backend |
-| `DYNAMODB_TABLE` | Table name | Required when STORE_BACKEND=dynamodb |
-| `FIRESTORE_COLLECTION` | Collection name | Required when STORE_BACKEND=firestore |
-
-### Order Service
-
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `QUEUE_BACKEND` | `memory` (default), `sqs`, `pubsub`, `servicebus` | Message queue backend |
-| `SQS_QUEUE_URL` | Queue URL | Required when QUEUE_BACKEND=sqs |
-| `PUBSUB_TOPIC` | Topic name | Required when QUEUE_BACKEND=pubsub |
-
-### User Service
-
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `DB_BACKEND` | `memory` (default), `postgres` | Database backend |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Connection details | Required when DB_BACKEND=postgres |
-| `JWT_SECRET` | Secret string | **Change this in production!** |
-
-### Notification Service
-
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `QUEUE_BACKEND` | `memory` (default), `sqs`, `pubsub`, `servicebus` | Queue to poll for events |
-| `EMAIL_BACKEND` | `console` (default), `ses`, `sendgrid` | Email sending backend |
-| `FROM_EMAIL` | Email address | Sender email for cloud backends |
-
-## Assignment Tasks
-
-Your group needs to:
-
-1. **Containerise** — The Dockerfiles are provided as best-practice examples. Review and understand them.
-2. **Push to registry** — Push all 5 images to your cloud provider's container registry.
-3. **Implement cloud adapters** — Replace the in-memory stores with real cloud databases and queues.
-4. **Deploy to Kubernetes** — Create Deployments, Services, Ingress, ConfigMaps, and Secrets.
-5. **Secure** — Add NetworkPolicy, workload identity, WAF, and threat detection.
-6. **Build CI/CD** — Automate test → build → scan → push → deploy.
-7. **Monitor** — Set up dashboards, logging, and alerts.
-8. **Optimise costs** — Tag resources, analyse spend, right-size instances.
-
-See the full assignment brief for detailed requirements.
-
-## Project Structure
-
-```
-cloudmart-starter/
-├── docker-compose.yml          # Local development orchestration
-├── README.md                   # This file
-├── services/
-│   ├── product-service/
-│   │   ├── app.py              # Flask app with in-memory + cloud adapters
-│   │   ├── requirements.txt
-│   │   ├── Dockerfile          # Multi-stage, non-root, healthcheck
-│   │   └── .dockerignore
-│   ├── order-service/
-│   │   ├── src/index.js        # Express app with queue adapters
-│   │   ├── package.json
-│   │   ├── Dockerfile
-│   │   └── .dockerignore
-│   ├── user-service/
-│   │   ├── app.py              # Flask app with JWT + bcrypt
-│   │   ├── requirements.txt
-│   │   ├── Dockerfile
-│   │   └── .dockerignore
-│   ├── notification-service/
-│   │   ├── src/index.js        # Queue consumer + email sender
-│   │   ├── package.json
-│   │   ├── Dockerfile
-│   │   └── .dockerignore
-│   └── frontend/
-│       ├── src/                # React SPA source
-│       ├── public/
-│       ├── nginx.conf          # Reverse proxy config
-│       ├── package.json
-│       ├── Dockerfile          # Multi-stage: npm build → nginx
-│       └── .dockerignore
-├── k8s/                        # Kubernetes manifest templates
-│   ├── namespace.yaml
-│   ├── product-service.yaml
-│   ├── order-service.yaml
-│   ├── user-service.yaml
-│   ├── notification-service.yaml
-│   ├── frontend.yaml
-│   ├── configmap.yaml
-│   └── network-policy.yaml
-└── docs/adr/                   # Architecture Decision Records go here
+```bash
+aws eks update-kubeconfig --name cloudmart-prod --region us-east-1
+# Install controllers referenced by k8s/helm-values/ (LB controller, external-secrets,
+# metrics-server, cluster-autoscaler, kyverno, keda, argo-rollouts, argocd) via Helm.
 ```
 
-## Cloud Provider
+### 4. Deploy the application
 
-**Chosen provider:** _[Your group fills this in: AWS / GCP / Azure]_
+```bash
+# GitOps (preferred): push to develop -> staging, main -> production
+# or apply directly:
+kubectl apply -k k8s/overlays/prod
+kubectl get pods -n cloudmart-prod
+```
 
-## Team Members
+CI/CD then handles builds and deploys automatically: pushes to `develop` deploy to
+`cloudmart-staging`; pushes to `main` deploy to `cloudmart-prod` after manual approval.
 
-| Name | Student ID | Responsibilities |
-|------|-----------|-----------------|
-| | | |
-| | | |
-| | | |
-| | | |
-| | | |
+### Local development
 
-## AI Tool Disclosure
+```bash
+docker compose up --build      # runs all five services with in-memory backends
+```
 
-_[If your group used GitHub Copilot, ChatGPT, Claude, or any AI assistant, disclose here: which tools, for which tasks, and what review process you applied.]_
+## Team Members & Contributions
 
----
+| Member | Role | Primary Contributions |
+|--------|------|-----------------------|
+| Madhura Jayashanka | Platform / DevOps | Environment roots (prod/staging), CI/CD pipelines, monitoring & alarms, budgets, Velero/DR, cost & DR documentation |
+| Dilshan Prasanna Allepola | Core Infrastructure | Terraform networking (VPC) and managed-data modules — RDS, DynamoDB, SQS, S3, KMS, Route 53 |
+| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, external-secrets, ArgoCD, Kyverno policies, EKS/ECR |
+| Akhila Sanjeewa | Application & Helm | Microservice source (product/order/user/notification), Helm charts and values files |
+| Himasha Kodikara | Security & Frontend | IAM/IRSA workload identity, secrets integration, frontend SPA and cross-service app wiring |
 
-*IS 4630 Cloud Infrastructure Management | University of Moratuwa | Academic Year 2025/2026*
+## Further Documentation
+
+- [Architecture Decision Records](docs/adr/) — node type, user-service DB, deployment strategy
+- [Cost Analysis & FinOps](docs/cost-analysis.md)
+- [Disaster Recovery Plan](docs/disaster-recovery.md)

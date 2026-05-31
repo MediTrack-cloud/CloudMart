@@ -1,0 +1,153 @@
+name: CI — Build, Scan, Push
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint & unit tests per service
+  # ---------------------------------------------------------------------------
+  test-python:
+    name: Test Python services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [product-service, user-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install flake8 pytest
+          pip install -r services/${{ matrix.service }}/requirements.txt
+
+      - name: Lint
+        run: flake8 services/${{ matrix.service }} --max-line-length=120 --ignore=E501,W503
+
+      - name: Test
+        run: |
+          cd services/${{ matrix.service }}
+          pytest tests/ -v --tb=short
+
+  test-node:
+    name: Test Node.js services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [order-service, notification-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: services/${{ matrix.service }}/package.json
+
+      - name: Install dependencies
+        run: npm ci --prefix services/${{ matrix.service }}
+
+      - name: Test
+        run: npm test --prefix services/${{ matrix.service }} -- --passWithNoTests
+
+  # ---------------------------------------------------------------------------
+  # Docker build + Trivy scan + ECR push
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [test-python, test-node]
+    strategy:
+      matrix:
+        service: [product-service, order-service, user-service, notification-service, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build + scan need no AWS — runs on PRs and pushes alike. A local tag keeps
+      # PRs (incl. forks) from ever needing OIDC/ECR credentials.
+      - name: Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t cloudmart/${{ matrix.service }}:${{ github.sha }} \
+            services/${{ matrix.service }}
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cloudmart/${{ matrix.service }}:${{ github.sha }}
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL"
+          ignore-unfixed: true
+
+      # ── Push to ECR only on pushes to main/develop (never PRs / feature branches) ─
+      # PRs and feature branches don't (and shouldn't) get AWS access, so the OIDC
+      # assume-role runs only for the deployable branches. Immutable SHA tag only.
+      - name: Configure AWS credentials (OIDC)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag & push to ECR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        run: |
+          ECR_IMAGE=${{ steps.ecr-login.outputs.registry }}/cloudmart/${{ matrix.service }}:${{ github.sha }}
+          docker tag cloudmart/${{ matrix.service }}:${{ github.sha }} "$ECR_IMAGE"
+          docker push "$ECR_IMAGE"
+
+  # ---------------------------------------------------------------------------
+  # Validate Kubernetes manifests
+  # ---------------------------------------------------------------------------
+  validate-k8s:
+    name: Validate K8s manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate base manifests
+        run: |
+          find k8s/base -name "*.yaml" | xargs kubeconform \
+            -strict \
+            -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+
+      - name: Install kustomize
+        run: |
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Validate overlays (dry-run kustomize build)
+        # prod cherry-picks base files (to swap the product Deployment for the
+        # Argo Rollout), so it references files across the overlay root —
+        # LoadRestrictionsNone permits that for a trusted in-repo build.
+        run: |
+          kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/staging > /dev/null
+          kustomize build --load-restrictor LoadRestrictionsNone k8s/overlays/prod    > /dev/null

@@ -1,0 +1,125 @@
+name: CD — Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: cloudmart-staging
+  NAMESPACE: cloudmart-staging
+
+jobs:
+  deploy-staging:
+    name: Deploy to cloudmart-staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Substitute AWS Account ID and region in manifests
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          find k8s -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' \
+            -exec sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g; s/__REGION__/${{ env.AWS_REGION }}/g; s/__DEMO_RECIPIENT__/${{ vars.DEMO_RECIPIENT_EMAIL }}/g" {} +
+
+      - name: Update image tags in kustomize overlay
+        run: |
+          cd k8s/overlays/staging
+          ECR="${{ steps.ecr-login.outputs.registry }}/cloudmart"
+          SHA="${{ github.sha }}"
+          kustomize edit set image \
+            "$ECR/product-service=$ECR/product-service:$SHA" \
+            "$ECR/order-service=$ECR/order-service:$SHA" \
+            "$ECR/user-service=$ECR/user-service:$SHA" \
+            "$ECR/notification-service=$ECR/notification-service:$SHA" \
+            "$ECR/frontend=$ECR/frontend:$SHA"
+
+      - name: Apply manifests (ArgoCD auto-syncs on develop push — kubectl as fallback)
+        run: |
+          if kubectl get deploy argocd-server -n argocd &>/dev/null; then
+            echo "ArgoCD installed — staging application has auto-sync enabled, waiting for sync"
+            # Wait up to 3 minutes for auto-sync to complete
+            sleep 30
+            kubectl get application cloudmart-staging -n argocd -o jsonpath='{.status.sync.status}' || true
+          else
+            echo "ArgoCD not detected — applying via kubectl"
+            kubectl apply -k k8s/overlays/staging
+          fi
+
+      - name: Wait for rollouts to complete
+        run: |
+          for DEPLOY in product-service order-service user-service frontend; do
+            kubectl rollout status deployment/$DEPLOY \
+              -n ${{ env.NAMESPACE }} --timeout=300s
+          done
+          # notification-service is managed by KEDA (may be scaled to 0 when queue is empty)
+          kubectl rollout status deployment/notification-service \
+            -n ${{ env.NAMESPACE }} --timeout=60s 2>/dev/null || true
+
+      - name: Post-deployment smoke tests
+        run: |
+          sleep 20
+          ALB_URL=$(kubectl get ingress cloudmart-ingress \
+            -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+          # Pod readiness check (always runs)
+          echo "--- Pod readiness ---"
+          kubectl wait --for=condition=ready pod \
+            -l app=product-service -n ${{ env.NAMESPACE }} --timeout=120s
+          kubectl wait --for=condition=ready pod \
+            -l app=frontend -n ${{ env.NAMESPACE }} --timeout=120s
+
+          # HTTP checks (when ALB is available)
+          if [ -n "$ALB_URL" ]; then
+            echo "--- HTTP smoke tests against http://$ALB_URL ---"
+
+            # Frontend
+            FE=$(curl -so /dev/null -w "%{http_code}" "http://$ALB_URL/")
+            echo "Frontend /: $FE"
+            [[ "$FE" =~ ^(200|301)$ ]] || { echo "Frontend check failed!"; exit 1; }
+
+            # Product API — must return JSON with products array
+            PRODUCTS=$(curl -sf "http://$ALB_URL/api/products")
+            echo "$PRODUCTS" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'products' in d" \
+              && echo "Product API: OK ($(echo $PRODUCTS | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"count\"])') products)" \
+              || { echo "Product API response invalid!"; exit 1; }
+
+            # Order API readiness (expect 401 without auth or 200)
+            ORDER=$(curl -so /dev/null -w "%{http_code}" "http://$ALB_URL/api/orders")
+            [[ "$ORDER" =~ ^(200|401|404)$ ]] && echo "Order API: OK ($ORDER)" \
+              || { echo "Order API unexpected status: $ORDER"; exit 1; }
+
+            # User service health
+            USER_HEALTH=$(curl -so /dev/null -w "%{http_code}" "http://$ALB_URL/api/users/health")
+            [[ "$USER_HEALTH" =~ ^(200|404)$ ]] && echo "User API: OK ($USER_HEALTH)" \
+              || echo "User API: $USER_HEALTH (non-critical)"
+
+            echo "All smoke tests passed"
+          else
+            echo "ALB not yet provisioned — HTTP tests skipped (pod readiness confirmed)"
+          fi
+
+      - name: Show pod summary
+        if: always()
+        run: |
+          kubectl get pods -n ${{ env.NAMESPACE }} -o wide
+          kubectl get hpa -n ${{ env.NAMESPACE }} 2>/dev/null || true

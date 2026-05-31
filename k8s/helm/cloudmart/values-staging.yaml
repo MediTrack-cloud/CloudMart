@@ -1,0 +1,29 @@
+global:
+  environment: staging
+  namespace: cloudmart-staging
+
+product-service:
+  replicaCount: 1
+  hpa:
+    minReplicas: 1
+    maxReplicas: 3
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
+
+order-service:
+  replicaCount: 1
+  hpa:
+    minReplicas: 1
+    maxReplicas: 3
+
+user-service:
+  replicaCount: 1
+
+notification-service:
+  keda:
+    enabled: false
+  replicaCount: 1
+
+frontend:
+  replicaCount: 1

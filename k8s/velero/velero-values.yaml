@@ -1,0 +1,48 @@
+# Velero Helm values for CloudMart Kubernetes backup.
+# Install: helm install velero vmware-tanzu/velero -n velero --create-namespace -f k8s/velero/velero-values.yaml
+
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: cloudmart-velero-ACCOUNT_ID
+      config:
+        region: __REGION__
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: __REGION__
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.9.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+serviceAccount:
+  server:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cloudmart-velero-role-staging
+
+credentials:
+  useSecret: false   # use IRSA — no static credentials in cluster
+
+schedules:
+  cloudmart-daily:
+    disabled: false
+    schedule: "0 2 * * *"     # 02:00 UTC daily
+    template:
+      ttl: 168h               # 7-day retention
+      includedNamespaces:
+        - cloudmart-prod
+      storageLocation: default
+      volumeSnapshotLocations:
+        - default
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false

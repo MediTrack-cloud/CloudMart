@@ -1,0 +1,77 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloudmart-staging
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - ../../external-secrets
+
+patches:
+  # Override namespace for all resources to cloudmart-staging
+  - patch: |
+      - op: replace
+        path: /metadata/namespace
+        value: cloudmart-staging
+    target:
+      kind: Deployment
+  - patch: |
+      - op: replace
+        path: /metadata/namespace
+        value: cloudmart-staging
+    target:
+      kind: Service
+
+  # Reduce replicas for staging (cost saving)
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: frontend
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: product-service
+  - patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: order-service
+
+  # Patch ServiceAccount IRSA annotations for staging roles
+  - patch: |
+      - op: replace
+        path: /metadata/annotations/eks.amazonaws.com~1role-arn
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-product-service-role-staging
+    target:
+      kind: ServiceAccount
+      name: product-service-sa
+  - patch: |
+      - op: replace
+        path: /metadata/annotations/eks.amazonaws.com~1role-arn
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-order-service-role-staging
+    target:
+      kind: ServiceAccount
+      name: order-service-sa
+  - patch: |
+      - op: replace
+        path: /metadata/annotations/eks.amazonaws.com~1role-arn
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-user-service-role-staging
+    target:
+      kind: ServiceAccount
+      name: user-service-sa
+  - patch: |
+      - op: replace
+        path: /metadata/annotations/eks.amazonaws.com~1role-arn
+        value: arn:aws:iam::ACCOUNT_ID:role/cloudmart-notification-service-role-staging
+    target:
+      kind: ServiceAccount
+      name: notification-service-sa
