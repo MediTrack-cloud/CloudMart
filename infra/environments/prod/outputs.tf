@@ -13,3 +13,4 @@ output "waf_arn" { value = module.security.waf_arn }
 output "dr_website_url" { value = module.s3.dr_website_endpoint }
 output "velero_role_arn" { value = module.iam.velero_role_arn }
 output "xray_role_arn" { value = module.iam.xray_role_arn }
+output "keda_operator_role_arn" { value = module.iam.keda_operator_role_arn }

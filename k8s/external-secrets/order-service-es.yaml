@@ -14,5 +14,5 @@ spec:
   data:
     - secretKey: SQS_QUEUE_URL
       remoteRef:
-        key: cloudmart/order-service/staging
+        key: cloudmart/order-service/__ENV__
         property: SQS_QUEUE_URL

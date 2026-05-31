@@ -31,7 +31,7 @@ CloudMart has been re-platformed from a single-VM monolith into **five container
 - **Progressive delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, Argo Rollouts canary, smoke tests and automatic rollback.
 
 **Outcome metrics.**
-- **Cost:** ~**\$321/month** production, ~**\$212/month** staging on-demand; **\$32.10 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$266/yr (37%)** on compute.
+- **Cost:** ~**\$401/month** production, ~**\$253/month** staging on-demand; **\$40.10 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$621/yr (37%)** on compute.
 - **Availability:** 2+ replicas per production service, HPA + Cluster Autoscaler, RDS Multi-AZ, PodDisruptionBudgets.
 - **Security posture:** least-privilege IAM, no public database, encrypted everywhere, automated vulnerability gates, admission policy enforcement.
 - **Recovery:** RDS **RPO ≤ 5 min / RTO ≤ 2 min**; full-stack rebuild ≤ 60 min via IaC + Velero.
@@ -75,7 +75,7 @@ All five services run as Deployments in namespace **`cloudmart-prod`** (and **`c
 
 Every container declares **resource requests/limits**, **liveness + readiness probes**, a **rolling strategy `maxSurge:1 / maxUnavailable:0`**, a non-root `securityContext` (`readOnlyRootFilesystem`, dropped capabilities), and a **PodDisruptionBudget (minAvailable:1)**. The **Cluster Autoscaler** adds nodes (2→6) when pods cannot schedule; the **Metrics Server** feeds the HPAs. The **Ingress** uses the AWS Load Balancer Controller with ALB annotations (TLS 1.3 policy, WAF ACL attachment, `/health` health check).
 
-**Technology choices justified:** EKS managed node group on `t3.medium` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); Argo Rollouts canary for the highest-traffic product-service (ADR-003).
+**Technology choices justified:** EKS managed node group on `m7i-flex.large` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); Argo Rollouts canary for the highest-traffic product-service (ADR-003).
 
 ---
 
@@ -166,38 +166,38 @@ Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploy
 
 | Category | Monthly |
 |----------|--------:|
-| Compute (EKS control plane + 2× t3.medium) | \$133 |
+| Compute (EKS control plane + 2× m7i-flex.large) | \$213 |
 | Database (RDS db.t3.small Multi-AZ + DynamoDB) | \$57 |
 | Network (2× NAT + ALB + VPC endpoints) | \$112 |
 | Security/ops (WAF, KMS, Secrets, GuardDuty, CloudWatch) | \$17 |
 | Storage (S3, ECR) | \$2 |
-| **Total (prod)** | **~\$321** |
-| **Total (staging)** | **~\$212** |
+| **Total (prod)** | **~\$401** |
+| **Total (staging)** | **~\$253** |
 
 **[SCREENSHOT] Daily spend by tag** — *AWS Console → Cost Explorer → filter `Project=cloudmart`, group by `Environment`*. All resources are tagged via Terraform `default_tags` (`Project, Environment, Team, Owner, ManagedBy`) so nothing escapes attribution.
 
 ### 5.2 Unit economics
-At a modelled capacity of 10,000 orders/month against \$321 fixed cost:
+At a modelled capacity of 10,000 orders/month against \$401 fixed cost:
 
 ```
-Cost per order        = $321 / 10,000 = $0.0321
-Cost per 1,000 orders = $32.10
+Cost per order        = $401 / 10,000 = $0.0401
+Cost per 1,000 orders = $40.10
 ```
-At 5× volume, fixed costs amortise to **~\$6.42 per 1,000 orders**.
+At 5× volume, fixed costs amortise to **~\$8.02 per 1,000 orders**.
 
-### 5.3 Savings analysis (1-year commitment on 2× t3.medium)
+### 5.3 Savings analysis (1-year commitment on 2× m7i-flex.large)
 
 | Option | Annual cost | Saving |
 |--------|------------:|-------:|
-| On-demand (current) | \$728.88 | — |
-| 1-yr RI, no upfront | \$462.48 | **\$266 (37%)** |
-| 1-yr RI, all upfront | \$432.00 | \$297 (41%) |
-| Compute Savings Plan | \$510.24 | \$219 (30%) |
+| On-demand (current) | \$1,677.70 | — |
+| 1-yr RI, no upfront | \$1,056.95 | **\$621 (37%)** |
+| 1-yr RI, all upfront | \$989.84 | \$688 (41%) |
+| Compute Savings Plan | \$1,174.39 | \$503 (30%) |
 
-**Recommendation:** 1-yr RI No-Upfront — predictable savings without capital outlay; switch to a Savings Plan if instance families are expected to change.
+**Recommendation:** 1-yr RI No-Upfront — predictable savings without capital outlay. As the nodes run the **flex** instance family, a Compute Savings Plan is the more natural fit if instance families are expected to change.
 
 ### 5.4 Cost optimisation actions taken
-Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10 lifecycle; **KEDA scale-to-zero** for notification-service; S3/DynamoDB **gateway endpoints** eliminate NAT data-transfer cost; burstable `t3.medium` nodes (ADR-001). Compute Optimizer recommendations were reviewed and **accepted** (workload is right-sized).
+Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10 lifecycle; **KEDA scale-to-zero** for notification-service; S3/DynamoDB **gateway endpoints** eliminate NAT data-transfer cost; latest-gen `m7i-flex.large` flex nodes (ADR-001). Compute Optimizer recommendations were reviewed and **accepted** (workload is right-sized).
 
 ---
 
@@ -235,7 +235,7 @@ Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10
 
 ## 7. Architecture Decision Records (summaries)
 
-**ADR-001 — EKS node instance type (Accepted).** Compared `t3.small / t3.medium / t3.large / m5.large`. Chose **`t3.medium`** (2 vCPU / 4 GiB): fits all five services + system pods with headroom, burstable CPU suits demo load, ~\$60/mo for 2 nodes. Trade-off: CPU credits can throttle under sustained load — mitigated by HPA + Cluster Autoscaler. *(Cost-architecture trade-off ADR.)*
+**ADR-001 — EKS node instance type (Accepted).** Compared a general-purpose, compute-optimised and ARM option: `t3.medium` / `m7i-flex.large` / `c7i.large` / `m7g.large`. Chose **`m7i-flex.large`** (2 vCPU / 8 GiB, 1:4 ratio): 8 GiB headroom fits all five services + system pods comfortably (the 4 GiB options were too tight), latest-gen Intel price/performance, and amd64-native to match the CI image pipeline. ARM `m7g.large` was ~15% cheaper but rejected — our images are `linux/amd64`-only and would need a multi-arch build. ~\$140/mo for 2 nodes. Trade-off: ~\$80/mo more than t3.medium, accepted for memory headroom. *(Cost-architecture trade-off ADR.)*
 
 **ADR-002 — user-service database (Accepted).** Compared managed PostgreSQL vs DynamoDB vs Aurora Serverless vs self-managed. Chose **RDS PostgreSQL db.t3.micro/small**: relational auth data (unique email, profile schema) needs strong consistency and joins; managed backups/PITR satisfy DR; ~\$13–55/mo. DynamoDB rejected (poor fit for relational queries); Aurora rejected (cost/overkill).
 

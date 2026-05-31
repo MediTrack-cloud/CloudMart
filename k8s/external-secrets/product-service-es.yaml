@@ -14,5 +14,5 @@ spec:
   data:
     - secretKey: DYNAMODB_TABLE
       remoteRef:
-        key: cloudmart/product-service/staging
+        key: cloudmart/product-service/__ENV__
         property: DYNAMODB_TABLE

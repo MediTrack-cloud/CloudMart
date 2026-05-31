@@ -422,13 +422,13 @@ All cost-saving measures are pre-configured in `infra/environments/staging/terra
 | Resource | Rate | 1 Week (168 hrs) |
 |---|---|---:|
 | EKS Control Plane | $0.10/hr | $16.80 |
-| EC2 Workers (2× t3.medium) | $0.0416/hr × 2 | $13.98 |
+| EC2 Workers (2× m7i-flex.large) | $0.09576/hr × 2 | $32.18 |
 | NAT Gateway | $0.045/hr | $7.56 |
 | VPC Endpoints (3 Interface × 2 AZ) | $0.01/hr × 6 | $10.08 |
 | ALB | $0.0225/hr + LCU | ~$3.78 |
 | RDS PostgreSQL (db.t3.micro) | $0.017/hr | $2.86 |
 | Storage, data transfer, logs | variable | ~$2.00 |
-| **Total** | | **~$57** |
+| **Total** | | **~$75** |
 
 > [!TIP]
 > If you want to save more during nights/weekends when you're not testing, you can scale the node group to 0 and back:
