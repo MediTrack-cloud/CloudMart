@@ -1,0 +1,8 @@
+### product-service ServiceAccount → IRSA role annotation
+arn:aws:iam::898865655202:role/cloudmart-product-service-role-prod
+
+### All service IRSA bindings in cloudmart-prod
+product-service-sa         arn:aws:iam::898865655202:role/cloudmart-product-service-role-prod
+order-service-sa           arn:aws:iam::898865655202:role/cloudmart-order-service-role-prod
+user-service-sa            arn:aws:iam::898865655202:role/cloudmart-user-service-role-prod
+notification-service-sa    arn:aws:iam::898865655202:role/cloudmart-notification-service-role-prod

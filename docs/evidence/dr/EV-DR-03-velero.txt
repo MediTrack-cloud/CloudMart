@@ -1,0 +1,2 @@
+NAME                     STATUS    SCHEDULE    LASTBACKUP   AGE     PAUSED
+velero-cloudmart-daily   Enabled   0 2 * * *                7h22m   

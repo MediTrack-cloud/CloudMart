@@ -1,0 +1,4 @@
+NAME                                   REFERENCE                         TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
+keda-hpa-notification-service-scaler   Deployment/notification-service   <unknown>/5 (avg)   1         5         0          6h33m
+order-service-hpa                      Deployment/order-service          cpu: 6%/60%         2         6         2          7h20m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          7h20m

@@ -1,0 +1,12 @@
+NAME                               READY   STATUS             RESTARTS   AGE     IP            NODE                          NOMINATED NODE   READINESS GATES
+frontend-5d78db9bbc-8dwp5          1/1     Running            0          6m24s   10.0.11.59    ip-10-0-11-219.ec2.internal   <none>           <none>
+frontend-5d78db9bbc-z2zll          1/1     Running            0          4m44s   10.0.10.72    ip-10-0-10-73.ec2.internal    <none>           <none>
+order-service-548ff7465-b4wf9      1/1     Running            0          6m3s    10.0.11.12    ip-10-0-11-219.ec2.internal   <none>           <none>
+order-service-548ff7465-pvl4c      1/1     Running            0          6m24s   10.0.11.186   ip-10-0-11-219.ec2.internal   <none>           <none>
+product-service-566c7d554f-h9fvh   0/1     ImagePullBackOff   0          7h19m   10.0.10.142   ip-10-0-10-73.ec2.internal    <none>           <none>
+product-service-566c7d554f-md29k   0/1     ImagePullBackOff   0          7h19m   10.0.11.223   ip-10-0-11-219.ec2.internal   <none>           <none>
+product-service-69fd859df6-rmzrx   1/1     Running            0          6h32m   10.0.10.108   ip-10-0-10-73.ec2.internal    <none>           <none>
+product-service-7d668bf68c-bvrlv   1/1     Running            0          6m23s   10.0.10.231   ip-10-0-10-73.ec2.internal    <none>           <none>
+product-service-7d668bf68c-jv8sd   1/1     Running            0          6m24s   10.0.10.10    ip-10-0-10-73.ec2.internal    <none>           <none>
+user-service-547cf6cf7-bbgjt       1/1     Running            0          6m23s   10.0.11.24    ip-10-0-11-219.ec2.internal   <none>           <none>
+user-service-547cf6cf7-dxlfs       1/1     Running            0          6m2s    10.0.11.70    ip-10-0-11-219.ec2.internal   <none>           <none>

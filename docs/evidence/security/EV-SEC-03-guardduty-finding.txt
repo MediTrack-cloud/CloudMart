@@ -1,0 +1,13 @@
+### GuardDuty sample findings generated for the demo (detector 16cf3e91f8149e899bdbf8034d538e27)
+### Created: Sun May 31 16:33:15 UTC 2026
+
+Total findings: 1
+
+### Top findings (severity / type / title):
+-----------------------------------------------------------------------------------
+|                                   GetFindings                                   |
++----------+----------------------------------------------------------------------+
+|  Severity|  2.0                                                                 |
+|  Title   |  The API DescribeMetricFilters was invoked using root credentials.   |
+|  Type    |  Policy:IAMUser/RootCredentialUsage                                  |
++----------+----------------------------------------------------------------------+
