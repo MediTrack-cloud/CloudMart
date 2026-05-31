@@ -13,6 +13,7 @@ resources:
   - ../../base/network-policies/allow-user-service.yaml
   - ../../base/network-policies/allow-frontend-egress.yaml
   - ../../base/product-service/serviceaccount.yaml
+  - ../../base/product-service/deployment.yaml
   - ../../base/product-service/service.yaml
   - ../../base/product-service/hpa.yaml
   - ../../base/product-service/pdb.yaml
@@ -37,8 +38,6 @@ resources:
   - ../../external-secrets/order-service-es.yaml
   - ../../external-secrets/user-service-es.yaml
   - ../../external-secrets/notification-service-es.yaml
-  # product-service uses Argo Rollout (not a standard Deployment) in prod
-  - ../../argo-rollouts/product-service-rollout.yaml
   # Security policies enforced only in prod
   - ../../security/kyverno-block-root.yaml
   - ../../security/kyverno-ecr-only.yaml

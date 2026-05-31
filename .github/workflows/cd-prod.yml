@@ -92,48 +92,18 @@ jobs:
             "$ECR/notification-service=$ECR/notification-service:$SHA" \
             "$ECR/frontend=$ECR/frontend:$SHA"
 
-      - name: Apply manifests (GitOps via ArgoCD or direct kubectl)
-        run: |
-          # Preferred: ArgoCD sync (if ArgoCD is installed)
-          if kubectl get deploy argocd-server -n argocd &>/dev/null; then
-            # Install ArgoCD CLI
-            curl -sSL -o /usr/local/bin/argocd \
-              https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-            chmod +x /usr/local/bin/argocd
-            ARGOCD_SERVER=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            argocd login "$ARGOCD_SERVER" --grpc-web \
-              --username admin \
-              --password "${{ secrets.ARGOCD_PASSWORD }}" \
-              --insecure
-            argocd app sync cloudmart-prod --force
-            argocd app wait cloudmart-prod --health --timeout 300
-          else
-            # Fallback: direct kubectl apply
-            kubectl apply -k k8s/overlays/prod
-          fi
-
-      - name: Trigger Argo Rollout for product-service (canary)
-        run: |
-          ECR="${{ steps.ecr-login.outputs.registry }}/cloudmart"
-          SHA="${{ github.sha }}"
-
-          if kubectl get rollout product-service -n ${{ env.NAMESPACE }} &>/dev/null; then
-            kubectl argo rollouts set image product-service \
-              product-service="$ECR/product-service:$SHA" \
-              -n ${{ env.NAMESPACE }}
-            kubectl argo rollouts get rollout product-service \
-              -n ${{ env.NAMESPACE }} --watch --timeout 10m
-          else
-            kubectl rollout status deployment/product-service \
-              -n ${{ env.NAMESPACE }} --timeout=300s
-          fi
+      - name: Apply manifests
+        run: kubectl apply -k k8s/overlays/prod
 
       - name: Wait for all deployments to be healthy
         run: |
-          for DEPLOY in order-service user-service notification-service frontend; do
+          for DEPLOY in product-service order-service user-service frontend; do
             kubectl rollout status deployment/$DEPLOY \
               -n ${{ env.NAMESPACE }} --timeout=300s
           done
+          # notification-service is KEDA-managed (may be scaled to 0 when the queue is empty)
+          kubectl rollout status deployment/notification-service \
+            -n ${{ env.NAMESPACE }} --timeout=60s 2>/dev/null || true
 
       - name: Production smoke tests
         run: |
@@ -175,9 +145,7 @@ jobs:
         if: failure()
         run: |
           echo "Deployment FAILED — initiating rollback for SHA ${{ github.sha }}"
-          kubectl argo rollouts abort product-service -n ${{ env.NAMESPACE }} 2>/dev/null || true
-          kubectl argo rollouts undo product-service -n ${{ env.NAMESPACE }} 2>/dev/null || true
-          for DEPLOY in order-service user-service notification-service frontend; do
+          for DEPLOY in product-service order-service user-service notification-service frontend; do
             kubectl rollout undo deployment/$DEPLOY -n ${{ env.NAMESPACE }} 2>/dev/null || true
           done
           echo "Rollback complete — check pod status"
