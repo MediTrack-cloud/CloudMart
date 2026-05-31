@@ -86,15 +86,22 @@ terraform init && terraform apply      # creates S3 state bucket + DynamoDB lock
 
 ```bash
 cd infra/environments/prod              # or environments/staging
+source ../../load-env.sh                # maps .env -> TF_VAR_* (emails, region, GitHub org)
 terraform init -backend-config=backend.tf
 terraform plan  -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-Before applying, set in `terraform.tfvars`:
-- `alert_email`, `ses_from_email`
+User-specific values (`aws_region`, `owner_email`, `alert_email`, `ses_from_email`,
+`github_org`, `github_repo`) live in **`.env`**, not in the committed `terraform.tfvars`.
+`source ../../load-env.sh` exports them as `TF_VAR_*` for a manual apply; `./deploy.sh -e prod`
+does the same automatically. Set in `.env` before applying:
+- `SES_FROM_EMAIL` / `DEMO_RECIPIENT_EMAIL` — must be **verified** SES identities (sandbox)
+- `ALERT_EMAIL`, `OWNER_EMAIL`, `GITHUB_ORG`
+
+Then in `terraform.tfvars` (env infra config) optionally set:
 - `bastion_allowed_cidrs` — your admin/VPN IP (leave `[]` to use SSM Session Manager)
-- (optional) `domain_name` for Route 53 DNS failover
+- `domain_name` for Route 53 DNS failover
 
 ### 3. Configure kubectl and platform add-ons
 

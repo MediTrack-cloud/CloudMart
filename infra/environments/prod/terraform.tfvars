@@ -1,9 +1,8 @@
+# ── Infrastructure config (env-specific, safe to commit) ───────────────────
 environment        = "prod"
-aws_region         = "us-east-1"
 team_id            = "group-01"
-owner_email        = "madhuraweerasooriye@gmail.com"
-single_nat_gateway = false
-rds_multi_az       = true
+single_nat_gateway = false # HA: one NAT gateway per AZ in prod
+rds_multi_az       = true  # prod RDS Multi-AZ automatic failover
 
 # Least privilege: set to your admin/VPN IP(s), e.g. ["203.0.113.10/32"].
 # Leave empty to disable inbound SSH entirely and use SSM Session Manager.
@@ -13,11 +12,13 @@ eks_max_nodes         = 6
 db_instance_class     = "db.t3.small"
 monthly_budget_usd    = "50"
 
-# Set these before applying:
-alert_email    = "madhuraweerasooriye@gmail.com"
-ses_from_email = "madhuraweerasooriye@gmail.com" # must be a VERIFIED SES identity
+# ── User-specific values come from .env → TF_VAR_ (do NOT hardcode here) ────
+# aws_region, owner_email, alert_email, ses_from_email, github_org, github_repo
+#   • via ./deploy.sh -e prod   (exports them automatically), or
+#   • for a manual `terraform apply`, first:  source ../../load-env.sh
+# SES stays in sandbox: ses_from_email + the demo recipient must be verified.
 
-# Optional — uncomment once domain is registered in Route 53:
+# Optional — uncomment once a domain is registered in Route 53:
 # domain_name  = "cloudmart.yourdomain.com"
-# alb_dns_name = ""  # Fill after first apply (kubectl get ingress -n cloudmart-prod)
-# alb_zone_id  = "Z35SXDOTRQ7X7K"  # us-east-1 ALB zone ID
+# alb_dns_name = ""                 # fill after first apply (kubectl get ingress -n cloudmart-prod)
+# alb_zone_id  = "Z35SXDOTRQ7X7K"   # us-east-1 ALB zone ID
