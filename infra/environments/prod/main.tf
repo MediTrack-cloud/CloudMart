@@ -36,15 +36,16 @@ module "vpc" {
 }
 
 module "eks" {
-  source                 = "../../modules/eks"
-  environment            = var.environment
-  aws_region             = var.aws_region
-  public_subnet_ids      = module.vpc.public_subnet_ids
-  private_app_subnet_ids = module.vpc.private_app_subnet_ids
-  cluster_sg_id          = module.vpc.eks_nodes_sg_id
-  eks_min_nodes          = var.eks_min_nodes
-  eks_max_nodes          = var.eks_max_nodes
-  eks_desired_nodes      = var.eks_min_nodes
+  source                  = "../../modules/eks"
+  environment             = var.environment
+  aws_region              = var.aws_region
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  private_app_subnet_ids  = module.vpc.private_app_subnet_ids
+  cluster_sg_id           = module.vpc.eks_nodes_sg_id
+  eks_min_nodes           = var.eks_min_nodes
+  eks_max_nodes           = var.eks_max_nodes
+  eks_desired_nodes       = var.eks_min_nodes
+  github_actions_role_arn = module.iam.github_actions_role_arn
 }
 
 module "ecr" {
