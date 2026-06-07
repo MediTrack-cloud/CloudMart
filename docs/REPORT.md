@@ -31,7 +31,7 @@ CloudMart has been re-platformed from a single-VM monolith into **five container
 - **Progressive delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, Argo Rollouts canary, smoke tests and automatic rollback.
 
 **Outcome metrics.**
-- **Cost:** ~**\$401/month** production, ~**\$253/month** staging on-demand; **\$40.10 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$621/yr (37%)** on compute.
+- **Cost:** ~**\$416/month** production, ~**\$343/month** staging on-demand; **\$41.60 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$621/yr (37%)** on compute.
 - **Availability:** 2+ replicas per production service, HPA + Cluster Autoscaler, RDS Multi-AZ, PodDisruptionBudgets.
 - **Security posture:** least-privilege IAM, no public database, encrypted everywhere, automated vulnerability gates, admission policy enforcement.
 - **Recovery:** RDS **RPO ≤ 5 min / RTO ≤ 2 min**; full-stack rebuild ≤ 60 min via IaC + Velero.
@@ -168,22 +168,22 @@ Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploy
 |----------|--------:|
 | Compute (EKS control plane + 2× m7i-flex.large) | \$213 |
 | Database (RDS db.t3.small Multi-AZ + DynamoDB) | \$57 |
-| Network (2× NAT + ALB + VPC endpoints) | \$112 |
+| Network (2× NAT + ALB + 3 interface endpoints) | \$127 |
 | Security/ops (WAF, KMS, Secrets, GuardDuty, CloudWatch) | \$17 |
 | Storage (S3, ECR) | \$2 |
-| **Total (prod)** | **~\$401** |
-| **Total (staging)** | **~\$253** |
+| **Total (prod)** | **~\$416** |
+| **Total (staging)** | **~\$343** |
 
 **[SCREENSHOT] Daily spend by tag** — *AWS Console → Cost Explorer → filter `Project=cloudmart`, group by `Environment`*. All resources are tagged via Terraform `default_tags` (`Project, Environment, Team, Owner, ManagedBy`) so nothing escapes attribution.
 
 ### 5.2 Unit economics
-At a modelled capacity of 10,000 orders/month against \$401 fixed cost:
+At a modelled capacity of 10,000 orders/month against \$416 fixed cost:
 
 ```
-Cost per order        = $401 / 10,000 = $0.0401
-Cost per 1,000 orders = $40.10
+Cost per order        = $416 / 10,000 = $0.0416
+Cost per 1,000 orders = $41.60
 ```
-At 5× volume, fixed costs amortise to **~\$8.02 per 1,000 orders**.
+At 5× volume, fixed costs amortise to **~\$8.32 per 1,000 orders**.
 
 ### 5.3 Savings analysis (1-year commitment on 2× m7i-flex.large)
 
@@ -297,7 +297,7 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | Req | Lvl | Status | Evidence |
 |-----|-----|--------|----------|
 | Default-deny NetworkPolicy | M | ✅ | `network-policies/default-deny.yaml` |
-| Explicit allow rules | M | ✅ | 6 allow policies + DNS |
+| Explicit allow rules | M | ✅ | 5 service allow policies + allow-DNS |
 | Per-service IRSA least privilege | M | ✅ | `modules/iam/main.tf` |
 | Node role no admin | M | ✅ | worker/CNI/ECR-read/SSM only |
 | DB encrypted at rest + TLS | M | ✅ | KMS + `rds.force_ssl` |
@@ -324,7 +324,7 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | Per-service log groups | M | ✅ | `modules/monitoring` |
 | Dashboard (cpu/mem/req/err/queue/db) | M | ✅ | `aws_cloudwatch_dashboard` |
 | Product error-rate alarm >5%/5min | M | ✅ | metric filter + alarm + SNS |
-| Custom order-throughput metric | R | ✅ | metric filter + structured log (fixed) |
+| Custom order-throughput metric | R | ✅ | metric filter + structured log |
 | Distributed tracing | D | ✅ | X-Ray daemonset + SDK |
 
 ### 3.7 IaC

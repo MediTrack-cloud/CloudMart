@@ -33,7 +33,8 @@ Real resource names baked into the commands (from the Terraform/K8s in this repo
 | Velero schedule | `cloudmart-prod-daily` (ns `velero`) |
 | Ingress / ALB | `cloudmart-ingress` (ns `cloudmart-prod`) |
 | ECR repos | `cloudmart/<service>` |
-| ServiceAccounts (IRSA) | `product-service`, `order-service`, `user-service`, `notification-service` |
+| ServiceAccounts (IRSA) | `product-service-sa`, `order-service-sa`, `user-service-sa`, `notification-service-sa` |
+| IAM roles (IRSA) | `cloudmart-<service>-role-prod` (e.g. `cloudmart-product-service-role-prod`) |
 
 Set once per shell:
 ```bash
@@ -61,7 +62,7 @@ aws eks update-kubeconfig --name cloudmart-$ENV --region $AWS_REGION
 | File | Capture | Simulate |
 |------|---------|----------|
 | `EV-SEC-01-networkpolicy.txt` | `kubectl get networkpolicy -n $NS \| tee security/EV-SEC-01-networkpolicy.txt` (add `kubectl describe networkpolicy default-deny -n $NS` for detail). | Works on any cluster with the manifests applied (kind included). |
-| `EV-SEC-02-irsa-binding.png` | **Console:** IAM → Roles → `cloudmart-prod-product-service-irsa` → Trust relationships (shows the OIDC + SA condition). **+ CLI:** `kubectl get sa product-service -n $NS -o yaml \| tee security/EV-SEC-02-irsa-binding.txt` (shows `eks.amazonaws.com/role-arn`). | The `kubectl get sa … -o yaml` annotation is enough if you can't screenshot the console. |
+| `EV-SEC-02-irsa-binding.png` | **Console:** IAM → Roles → `cloudmart-product-service-role-prod` → Trust relationships (shows the OIDC + SA condition). **+ CLI:** `kubectl get sa product-service-sa -n $NS -o yaml \| tee security/EV-SEC-02-irsa-binding.txt` (shows `eks.amazonaws.com/role-arn`). | The `kubectl get sa … -o yaml` annotation is enough if you can't screenshot the console. |
 | `EV-SEC-03-guardduty-finding.png` | **Console:** GuardDuty → Findings → open the generated finding → screenshot severity + detail. | **Generate one:** `DET=$(aws guardduty list-detectors --query 'DetectorIds[0]' --output text); aws guardduty create-sample-findings --detector-id $DET --finding-types "UnauthorizedAccess:EKS/MaliciousIPCaller.Custom"` — appears in ~1 min. |
 | `EV-SEC-04-guardduty-response.md` | Written note: triage steps you took (SNS email → block offending IP at WAF → tighten NetworkPolicy). | n/a — this is narrative for report §3. |
 
@@ -92,7 +93,7 @@ aws eks update-kubeconfig --name cloudmart-$ENV --region $AWS_REGION
 |------|---------|----------|
 | `EV-COST-01-cost-explorer.png` | **Console:** Billing → Cost Explorer → filter `Project=cloudmart`, Group by tag `Environment`, daily granularity → screenshot. | Needs ≥24–48 h of real spend. No live account? Use **AWS Pricing Calculator** with the m7i-flex.large + RDS + NAT line items and screenshot that as the estimate. |
 | `EV-COST-02-budget-alert.png` | **Console:** Billing → Budgets → `cloudmart-monthly-prod` → screenshot the threshold + email alert config. | `aws budgets describe-budgets --account-id $(aws sts get-caller-identity --query Account --output text)` proves it exists immediately after apply. |
-| `EV-COST-03-unit-economics.png` | Slide built from `docs/cost-analysis.md` §3: **$40.10 / 1,000 orders** (prod $401 ÷ 10k orders). | n/a — derived from the cost doc; just render it as a slide. |
+| `EV-COST-03-unit-economics.png` | Slide built from `docs/cost-analysis.md` §3: **$41.60 / 1,000 orders** (prod $416 ÷ 10k orders). | n/a — derived from the cost doc; just render it as a slide. |
 
 ---
 
@@ -138,5 +139,5 @@ Use kind only to rehearse the `get nodes / networkpolicy / hpa` captures.
 export ENV=prod AWS_REGION=us-east-1
 ./docs/evidence/capture.sh           # writes every CLI-based EV-*.txt into the sub-folders
 ```
-Then take the console screenshots flagged `.png` above and tick them off in
-[`../../TODO-AUDIT.md`](../../TODO-AUDIT.md).
+Then take the console screenshots flagged `.png` above and tick them off against the
+checklist in this guide.
