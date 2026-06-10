@@ -51,7 +51,7 @@ const styles = {
   cardPrice: {
     fontSize: "22px",
     fontWeight: "bold",
-    color: "#00ff00",
+    color: "#e94560",
     margin: "8px 0",
   },
   badge: {
@@ -63,7 +63,7 @@ const styles = {
     fontSize: "12px",
   },
   btn: {
-    background: "#00ff00",
+    background: "#e94560",
     color: "#fff",
     border: "none",
     padding: "10px 20px",
@@ -113,7 +113,7 @@ const styles = {
     color: "#2e7d32",
   },
   cartBadge: {
-    background: "#00ff00",
+    background: "#e94560",
     color: "#fff",
     borderRadius: "50%",
     padding: "2px 8px",
@@ -556,7 +556,7 @@ function CartPage({ cart, removeFromCart, cartTotal, placeOrder, loading }) {
                 ...styles.td,
                 fontWeight: "bold",
                 fontSize: "18px",
-                color: "#00ff00",
+                color: "#e94560",
               }}
             >
               ${cartTotal.toFixed(2)}
@@ -635,7 +635,7 @@ function OrdersPage({ orders }) {
               textAlign: "right",
               fontSize: "18px",
               fontWeight: "bold",
-              color: "#00ff00",
+              color: "#e94560",
               marginTop: "8px",
             }}
           >
@@ -743,7 +743,7 @@ function AuthModal({ onAuth, onClose, loading }) {
             style={{
               background: "none",
               border: "none",
-              color: "#00ff00",
+              color: "#e94560",
               cursor: "pointer",
               fontWeight: "600",
             }}

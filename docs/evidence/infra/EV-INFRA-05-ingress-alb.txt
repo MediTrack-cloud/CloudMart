@@ -1,11 +1,2 @@
-# ──────────────────────────────────────────────────────────────────
-# EV-INFRA-05  Frontend Ingress / ALB
-#
-# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
-#   kubectl get ingress -n cloudmart-prod -o wide
-#
-# Captured: 2026-05-31 16:42:15Z   account=898865655202  env=prod
-# ──────────────────────────────────────────────────────────────────
-
-NAME                CLASS    HOSTS   ADDRESS                                                                  PORTS   AGE
-cloudmart-ingress   <none>   *       k8s-cloudmar-cloudmar-d0fc49c083-465009489.us-east-1.elb.amazonaws.com   80      7h31m
+NAME                CLASS    HOSTS   ADDRESS                                                                   PORTS   AGE
+cloudmart-ingress   <none>   *       k8s-cloudmar-cloudmar-d0fc49c083-1457154856.us-east-1.elb.amazonaws.com   80      3h2m

@@ -9,7 +9,7 @@ metadata:
       All containers must declare CPU and memory requests and limits to prevent
       resource starvation and ensure Kubernetes scheduling accuracy.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-cpu-memory

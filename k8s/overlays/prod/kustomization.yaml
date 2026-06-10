@@ -29,6 +29,7 @@ resources:
   - ../../base/notification-service/serviceaccount.yaml
   - ../../base/notification-service/deployment.yaml
   - ../../base/notification-service/service.yaml
+  - ../../base/notification-service/pdb.yaml
   - ../../base/frontend/deployment.yaml
   - ../../base/frontend/service.yaml
   - ../../base/frontend/ingress.yaml

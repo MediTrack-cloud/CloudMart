@@ -26,6 +26,7 @@ resources:
   - notification-service/serviceaccount.yaml
   - notification-service/deployment.yaml
   - notification-service/service.yaml
+  - notification-service/pdb.yaml
   - frontend/deployment.yaml
   - frontend/service.yaml
   - frontend/ingress.yaml

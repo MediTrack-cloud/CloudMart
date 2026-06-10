@@ -1,11 +1,2 @@
-# ──────────────────────────────────────────────────────────────────
-# EV-DR-03  Velero backup schedule
-#
-# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
-#   kubectl get schedule -n velero
-#
-# Captured: 2026-05-31 16:44:00Z   account=898865655202  env=prod
-# ──────────────────────────────────────────────────────────────────
-
-NAME                     STATUS    SCHEDULE    LASTBACKUP   AGE     PAUSED
-velero-cloudmart-daily   Enabled   0 2 * * *                7h34m   
+NAME                     STATUS    SCHEDULE    LASTBACKUP   AGE    PAUSED
+velero-cloudmart-daily   Enabled   0 2 * * *                3h6m   

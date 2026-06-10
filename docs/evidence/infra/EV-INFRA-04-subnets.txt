@@ -1,21 +1,12 @@
-# ──────────────────────────────────────────────────────────────────
-# EV-INFRA-04  Three-tier subnets across 2 AZ
-#
-# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
-#   aws ec2 describe-subnets --region us-east-1 --filters Name=tag:Project,Values=cloudmart --query 'sort_by(Subnets,&AvailabilityZone)[].{Name:Tags[?Key==`Name`]|[0].Value,AZ:AvailabilityZone,CIDR:CidrBlock}' --output table
-#
-# Captured: 2026-05-31 16:42:13Z   account=898865655202  env=prod
-# ──────────────────────────────────────────────────────────────────
-
----------------------------------------------------------------------
-|                          DescribeSubnets                          |
-+------------+---------------+--------------------------------------+
-|     AZ     |     CIDR      |                Name                  |
-+------------+---------------+--------------------------------------+
-|  us-east-1a|  10.0.10.0/24 |  cloudmart-private-app-us-east-1a    |
-|  us-east-1a|  10.0.1.0/24  |  cloudmart-public-us-east-1a         |
-|  us-east-1a|  10.0.20.0/24 |  cloudmart-private-data-us-east-1a   |
-|  us-east-1b|  10.0.2.0/24  |  cloudmart-public-us-east-1b         |
-|  us-east-1b|  10.0.11.0/24 |  cloudmart-private-app-us-east-1b    |
-|  us-east-1b|  10.0.21.0/24 |  cloudmart-private-data-us-east-1b   |
-+------------+---------------+--------------------------------------+
+----------------------------------------
+|            DescribeSubnets           |
++-------------+----------------+-------+
+|     AZ      |     CIDR       | Tier  |
++-------------+----------------+-------+
+|  us-east-1b |  10.0.21.0/24  |  None |
+|  us-east-1a |  10.0.20.0/24  |  None |
+|  us-east-1b |  10.0.2.0/24   |  None |
+|  us-east-1b |  10.0.11.0/24  |  None |
+|  us-east-1a |  10.0.1.0/24   |  None |
+|  us-east-1a |  10.0.10.0/24  |  None |
++-------------+----------------+-------+

@@ -1,18 +1,9 @@
-# ──────────────────────────────────────────────────────────────────
-# EV-INFRA-02  Pods in cloudmart-prod
-#
-# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
-#   kubectl get pods -n cloudmart-prod -o wide
-#
-# Captured: 2026-05-31 16:42:10Z   account=898865655202  env=prod
-# ──────────────────────────────────────────────────────────────────
-
-NAME                               READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-frontend-5d78db9bbc-8dwp5          1/1     Running   0          18m   10.0.11.59    ip-10-0-11-219.ec2.internal   <none>           <none>
-frontend-5d78db9bbc-z2zll          1/1     Running   0          16m   10.0.10.72    ip-10-0-10-73.ec2.internal    <none>           <none>
-order-service-548ff7465-b4wf9      1/1     Running   0          17m   10.0.11.12    ip-10-0-11-219.ec2.internal   <none>           <none>
-order-service-548ff7465-pvl4c      1/1     Running   0          18m   10.0.11.186   ip-10-0-11-219.ec2.internal   <none>           <none>
-product-service-7d668bf68c-bvrlv   1/1     Running   0          18m   10.0.10.231   ip-10-0-10-73.ec2.internal    <none>           <none>
-product-service-7d668bf68c-jv8sd   1/1     Running   0          18m   10.0.10.10    ip-10-0-10-73.ec2.internal    <none>           <none>
-user-service-547cf6cf7-bbgjt       1/1     Running   0          18m   10.0.11.24    ip-10-0-11-219.ec2.internal   <none>           <none>
-user-service-547cf6cf7-dxlfs       1/1     Running   0          17m   10.0.11.70    ip-10-0-11-219.ec2.internal   <none>           <none>
+NAME                               READY   STATUS    RESTARTS   AGE    IP            NODE                          NOMINATED NODE   READINESS GATES
+frontend-db7cff67f-fl6z7           1/1     Running   0          109m   10.0.11.190   ip-10-0-11-136.ec2.internal   <none>           <none>
+frontend-db7cff67f-pkhvw           1/1     Running   0          109m   10.0.10.189   ip-10-0-10-222.ec2.internal   <none>           <none>
+order-service-5f56c4bf8c-d6nxf     1/1     Running   0          109m   10.0.11.81    ip-10-0-11-136.ec2.internal   <none>           <none>
+order-service-5f56c4bf8c-pz7v2     1/1     Running   0          109m   10.0.10.20    ip-10-0-10-222.ec2.internal   <none>           <none>
+product-service-56467b4677-fc4r4   1/1     Running   0          109m   10.0.11.132   ip-10-0-11-136.ec2.internal   <none>           <none>
+product-service-56467b4677-l9hbf   1/1     Running   0          109m   10.0.10.197   ip-10-0-10-222.ec2.internal   <none>           <none>
+user-service-588fbf6f45-l77vp      1/1     Running   0          109m   10.0.11.193   ip-10-0-11-136.ec2.internal   <none>           <none>
+user-service-588fbf6f45-qpfht      1/1     Running   0          109m   10.0.10.184   ip-10-0-10-222.ec2.internal   <none>           <none>

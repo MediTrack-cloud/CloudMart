@@ -8,7 +8,7 @@ metadata:
       Containers must not run as root or in privileged mode.
       All CloudMart services already use non-root users in their Dockerfiles.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: check-not-root
@@ -18,17 +18,19 @@ spec:
               kinds: [Pod]
               namespaces: [cloudmart-prod, cloudmart-staging]
       validate:
-        message: "Containers must not run as root. Set securityContext.runAsNonRoot=true."
-        pattern:
-          spec:
-            =(initContainers):
-              - =(securityContext):
-                  =(runAsNonRoot): "true"
-                  =(runAsUser): ">0"
-            containers:
-              - securityContext:
-                  runAsNonRoot: true
-                  =(runAsUser): ">0"
+        message: "Containers must not run as root. Set runAsNonRoot=true at the pod or container securityContext."
+        # Accept runAsNonRoot set at EITHER the pod level (what all CloudMart
+        # workloads do — spec.securityContext.runAsNonRoot) OR per container.
+        # A single `pattern` requiring it per-container wrongly blocks the valid
+        # pod-level form, so anyPattern allows both.
+        anyPattern:
+          - spec:
+              securityContext:
+                runAsNonRoot: true
+          - spec:
+              containers:
+                - securityContext:
+                    runAsNonRoot: true
 
     - name: check-not-privileged
       match:

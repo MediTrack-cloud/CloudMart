@@ -1,22 +1,40 @@
-# ──────────────────────────────────────────────────────────────────
-# EV-COST-02  Monthly budget + alert (filter Environment=prod)
-#
-# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
-#   aws budgets describe-budget --account-id 898865655202 --budget-name cloudmart-monthly-prod --query 'Budget.{Name:BudgetName,Limit:BudgetLimit,Filter:CostFilters,TimeUnit:TimeUnit}' --output json
-#
-# Captured: 2026-05-31 16:43:57Z   account=898865655202  env=prod
-# ──────────────────────────────────────────────────────────────────
-
-{
-    "Name": "cloudmart-monthly-prod",
-    "Limit": {
-        "Amount": "50.0",
-        "Unit": "USD"
-    },
-    "Filter": {
-        "TagKeyValue": [
-            "user:Environment$prod"
-        ]
-    },
-    "TimeUnit": "MONTHLY"
-}
+[
+    {
+        "BudgetName": "cloudmart-monthly-prod",
+        "BudgetLimit": {
+            "Amount": "50.0",
+            "Unit": "USD"
+        },
+        "CostFilters": {
+            "TagKeyValue": [
+                "user:Environment${var.environment}"
+            ]
+        },
+        "CostTypes": {
+            "IncludeTax": true,
+            "IncludeSubscription": true,
+            "UseBlended": false,
+            "IncludeRefund": true,
+            "IncludeCredit": true,
+            "IncludeUpfront": true,
+            "IncludeRecurring": true,
+            "IncludeOtherSubscription": true,
+            "IncludeSupport": true,
+            "IncludeDiscount": true,
+            "UseAmortized": false
+        },
+        "TimeUnit": "MONTHLY",
+        "TimePeriod": {
+            "Start": "2026-06-01T05:30:00+05:30",
+            "End": "2087-06-15T05:30:00+05:30"
+        },
+        "CalculatedSpend": {
+            "ActualSpend": {
+                "Amount": "0.0",
+                "Unit": "USD"
+            }
+        },
+        "BudgetType": "COST",
+        "LastUpdatedTime": "2026-06-10T11:00:21.978000+05:30"
+    }
+]

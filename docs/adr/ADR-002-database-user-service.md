@@ -33,7 +33,7 @@ The assignment mandates use of **Amazon RDS for PostgreSQL** specifically.
 
 ## Decision
 
-**Use Amazon RDS for PostgreSQL 15.4 on db.t3.micro (Single-AZ for staging, Multi-AZ for prod).**
+**Use Amazon RDS for PostgreSQL 15 on db.t3.micro (Single-AZ for staging, Multi-AZ for prod).**
 
 Rationale:
 1. **Assignment requirement** — the brief explicitly requires Amazon RDS for PostgreSQL for the user-service
@@ -57,7 +57,7 @@ Rationale:
 
 ## Implementation Notes
 
-- Terraform resource: `infra/modules/rds/main.tf` — `aws_db_instance` with `engine = "postgres"`, `engine_version = "15.4"`
+- Terraform resource: `infra/modules/rds/main.tf` — `aws_db_instance` with `engine = "postgres"`, `engine_version = "15"`
 - Credentials stored as: `cloudmart/rds/user-service/<env>` in Secrets Manager
 - `user-service` reads `DATABASE_URL` from env (injected by External Secrets Operator)
 - Staging: `multi_az = false` | Prod: `multi_az = true`

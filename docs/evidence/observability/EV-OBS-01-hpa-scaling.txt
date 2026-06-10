@@ -1,0 +1,23 @@
+NAME                                   REFERENCE                         TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
+keda-hpa-notification-service-scaler   Deployment/notification-service   <unknown>/5 (avg)   1         5         0          60m
+order-service-hpa                      Deployment/order-service          cpu: 5%/60%         2         6         2          97m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          97m
+order-service-hpa                      Deployment/order-service          cpu: 4%/60%         2         6         2          97m
+product-service-hpa                    Deployment/product-service        cpu: 3%/60%         2         6         2          98m
+order-service-hpa                      Deployment/order-service          cpu: 5%/60%         2         6         2          98m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          98m
+product-service-hpa                    Deployment/product-service        cpu: 3%/60%         2         6         2          99m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          99m
+product-service-hpa                    Deployment/product-service        cpu: 4%/60%         2         6         2          100m
+order-service-hpa                      Deployment/order-service          cpu: 4%/60%         2         6         2          100m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         2          100m
+order-service-hpa                      Deployment/order-service          cpu: 5%/60%         2         6         2          100m
+product-service-hpa                    Deployment/product-service        cpu: 329%/60%       2         6         2          100m
+product-service-hpa                    Deployment/product-service        cpu: 471%/60%       2         6         4          101m
+product-service-hpa                    Deployment/product-service        cpu: 335%/60%       2         6         6          101m
+product-service-hpa                    Deployment/product-service        cpu: 4%/60%         2         6         6          101m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         6          101m
+product-service-hpa                    Deployment/product-service        cpu: 4%/60%         2         6         6          102m
+product-service-hpa                    Deployment/product-service        cpu: 3%/60%         2         6         6          102m
+order-service-hpa                      Deployment/order-service          cpu: 6%/60%         2         6         2          102m
+product-service-hpa                    Deployment/product-service        cpu: 2%/60%         2         6         6          102m

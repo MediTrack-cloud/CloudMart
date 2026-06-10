@@ -100,7 +100,6 @@ for _addr in $_ses_addrs; do
 done
 
 # ── 3  Substitute ACCOUNT_ID + __REGION__ placeholders in kustomize manifests ─
-# (k8s/helm/* is excluded — Helm renders the registry from its own values.)
 log "Substituting ACCOUNT_ID=$ACCOUNT_ID, region=$AWS_REGION, env=$ENV in k8s/ manifests …"
 find "$K8S_DIR" -type f \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/helm/*' | while read -r f; do
   sedi -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/__REGION__/$AWS_REGION/g" -e "s/__ENV__/$ENV/g" "$f"

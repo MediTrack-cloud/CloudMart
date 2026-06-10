@@ -88,6 +88,39 @@ resource "aws_cloudwatch_dashboard" "cloudmart" {
           period = 60
           region = var.aws_region
         }
+      },
+      # Per-service (per-pod) CPU + memory from CloudWatch Container Insights.
+      # The "Service" dimension rolls pod metrics up by Kubernetes workload, giving
+      # the per-service CPU/memory view the dashboard requirement asks for.
+      {
+        type = "metric"
+        x    = 0, y = 18, width = 12, height = 6
+        properties = {
+          title  = "CPU Utilization per Service"
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          region = var.aws_region
+          metrics = [
+            for s in local.services :
+            ["ContainerInsights", "pod_cpu_utilization", "ClusterName", "cloudmart-${var.environment}", "Namespace", "cloudmart-${var.environment}", "Service", s]
+          ]
+        }
+      },
+      {
+        type = "metric"
+        x    = 12, y = 18, width = 12, height = 6
+        properties = {
+          title  = "Memory Utilization per Service"
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          region = var.aws_region
+          metrics = [
+            for s in local.services :
+            ["ContainerInsights", "pod_memory_utilization", "ClusterName", "cloudmart-${var.environment}", "Namespace", "cloudmart-${var.environment}", "Service", s]
+          ]
+        }
       }
     ]
   })

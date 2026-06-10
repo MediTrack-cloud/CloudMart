@@ -23,7 +23,7 @@
 
   <rect x="260" y="250" width="180" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
   <text x="350" y="277" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">product-service</text>
-  <text x="350" y="296" text-anchor="middle" font-size="12" fill="#475569">x2 · Svc:8001 · HPA 2→6</text>
+  <text x="350" y="296" text-anchor="middle" font-size="13" fill="#475569">x2 · Svc:8001</text>
 
   <rect x="470" y="250" width="160" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
   <text x="550" y="280" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">order-service</text>
@@ -57,7 +57,7 @@
 
   <rect x="40" y="668" width="770" height="74" rx="10" fill="#ece3ff" stroke="#8b5cf6"/>
   <text x="58" y="694" font-size="16" font-weight="600" fill="#7c3aed">Namespace: cloudmart-staging  (develop branch)</text>
-  <text x="58" y="720" font-size="13" fill="#475569">Same 5-service topology, 1 replica each (cost-optimised)</text>
+  <text x="58" y="720" font-size="13" fill="#475569">Same 5-service topology, reduced replicas (cost-optimised)</text>
 
   <rect x="850" y="250" width="220" height="56" rx="8" fill="#ffe9cc" stroke="#f59e0b"/>
   <text x="960" y="274" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">Cluster Autoscaler</text>
@@ -65,7 +65,7 @@
   <rect x="850" y="324" width="220" height="50" rx="8" fill="#fff3c4" stroke="#f59e0b"/>
   <text x="960" y="354" text-anchor="middle" font-size="13" fill="#1e293b">Metrics Server (HPA feed)</text>
   <rect x="850" y="392" width="220" height="56" rx="8" fill="#dceefb" stroke="#4a9eed"/>
-  <text x="960" y="426" text-anchor="middle" font-size="14" fill="#1e293b">EKS Nodes 2x t3.medium</text>
+  <text x="960" y="426" text-anchor="middle" font-size="14" fill="#1e293b">EKS Nodes 2x m7i-flex.large</text>
   <line x1="960" y1="306" x2="960" y2="392" stroke="#f59e0b" stroke-width="2" marker-end="url(#ao)"/>
   <text x="968" y="372" font-size="12" fill="#9a5030">scale</text>
   <line x1="740" y1="75" x2="955" y2="250" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ao)"/>

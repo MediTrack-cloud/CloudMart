@@ -1,0 +1,15 @@
+# PodDisruptionBudget for notification-service.
+# Keeps at least 1 replica available during voluntary disruptions (node drains).
+# Note: notification-service is KEDA-managed and may scale to 0 when the SQS queue
+# is empty; a PDB never forces pods to exist, so this only takes effect while the
+# service is running (≥1 replica) and is a no-op at 0 replicas.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service-pdb
+  namespace: cloudmart-prod
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: notification-service

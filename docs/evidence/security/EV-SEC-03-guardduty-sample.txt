@@ -1,0 +1,14 @@
+# GuardDuty sample finding evidence — 2026-06-10T09:03:25Z
+# Detector: 16cf3e91f8149e899bdbf8034d538e27   Region: us-east-1
+# Finding type generated: UnauthorizedAccess:EC2/SSHBruteForce
+
+SEV    TYPE                                              TITLE
+-----  ------------------------------------------------  ------------------------------
+2.0    UnauthorizedAccess:EC2/SSHBruteForce              198.51.100.0 is performing SSH brute force attacks against i-99999999.
+8.0    CryptoCurrency:EC2/BitcoinTool.B!DNS              The EC2 instance i-99999999 queried a Bitcoin-related domain name.
+2.0    Recon:EC2/PortProbeUnprotectedPort                An unprotected port on EC2 instance i-99999999 is being probed.
+8.0    Policy:S3/BucketAnonymousAccessGranted            Amazon S3 Public Anonymous Access was granted for the S3 bucket cloudmart-dr-prod-898865655202.
+2.0    Policy:S3/BucketBlockPublicAccessDisabled         Amazon S3 Block Public Access was disabled for the S3 bucket cloudmart-dr-prod-898865655202.
+2.0    Policy:S3/BucketBlockPublicAccessDisabled         Amazon S3 Block Public Access was disabled for the S3 bucket cloudmart-cloudtrail-prod-898865655202.
+2.0    Stealth:IAMUser/CloudTrailLoggingDisabled         An AWS CloudTrail trail arn:aws:cloudtrail:us-east-1:898865655202:trail/cloudmart-trail-prod was disabled.
+2.0    Policy:IAMUser/RootCredentialUsage                The API ListNotificationHubs was invoked using root credentials.
