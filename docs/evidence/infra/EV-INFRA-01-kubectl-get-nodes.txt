@@ -1,0 +1,3 @@
+NAME                          STATUS   ROLES    AGE     VERSION                INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                    CONTAINER-RUNTIME
+ip-10-0-10-222.ec2.internal   Ready    <none>   3h20m   v1.30.14-eks-3385e9b   10.0.10.222   <none>        Amazon Linux 2023.11.20260526   6.1.172-216.329.amzn2023.x86_64   containerd://2.2.3+unknown
+ip-10-0-11-136.ec2.internal   Ready    <none>   3h20m   v1.30.14-eks-3385e9b   10.0.11.136   <none>        Amazon Linux 2023.11.20260526   6.1.172-216.329.amzn2023.x86_64   containerd://2.2.3+unknown

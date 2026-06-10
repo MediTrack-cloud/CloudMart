@@ -8,7 +8,7 @@ metadata:
       All container images must be pulled from the approved ECR registry.
       This prevents supply-chain attacks from public Docker Hub images.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: check-ecr-registry

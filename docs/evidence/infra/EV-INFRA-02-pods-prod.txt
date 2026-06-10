@@ -1,0 +1,9 @@
+NAME                               READY   STATUS    RESTARTS   AGE    IP            NODE                          NOMINATED NODE   READINESS GATES
+frontend-db7cff67f-fl6z7           1/1     Running   0          109m   10.0.11.190   ip-10-0-11-136.ec2.internal   <none>           <none>
+frontend-db7cff67f-pkhvw           1/1     Running   0          109m   10.0.10.189   ip-10-0-10-222.ec2.internal   <none>           <none>
+order-service-5f56c4bf8c-d6nxf     1/1     Running   0          109m   10.0.11.81    ip-10-0-11-136.ec2.internal   <none>           <none>
+order-service-5f56c4bf8c-pz7v2     1/1     Running   0          109m   10.0.10.20    ip-10-0-10-222.ec2.internal   <none>           <none>
+product-service-56467b4677-fc4r4   1/1     Running   0          109m   10.0.11.132   ip-10-0-11-136.ec2.internal   <none>           <none>
+product-service-56467b4677-l9hbf   1/1     Running   0          109m   10.0.10.197   ip-10-0-10-222.ec2.internal   <none>           <none>
+user-service-588fbf6f45-l77vp      1/1     Running   0          109m   10.0.11.193   ip-10-0-11-136.ec2.internal   <none>           <none>
+user-service-588fbf6f45-qpfht      1/1     Running   0          109m   10.0.10.184   ip-10-0-10-222.ec2.internal   <none>           <none>

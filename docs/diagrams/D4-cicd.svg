@@ -49,8 +49,8 @@
   <rect x="300" y="468" width="140" height="62" rx="8" fill="#d6f7ec" stroke="#06b6d4"/>
   <text x="370" y="503" text-anchor="middle" font-size="13" fill="#1e293b">Velero backup</text>
   <rect x="470" y="464" width="240" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
-  <text x="590" y="492" text-anchor="middle" font-size="13" fill="#1e293b">Deploy prod: Argo canary</text>
-  <text x="590" y="512" text-anchor="middle" font-size="13" fill="#1e293b">20-&gt;40-&gt;100 (halt if err &gt; 1%)</text>
+  <text x="590" y="492" text-anchor="middle" font-size="13" fill="#1e293b">Deploy prod: rolling update</text>
+  <text x="590" y="512" text-anchor="middle" font-size="13" fill="#1e293b">(maxUnavailable 0, health-gated)</text>
   <rect x="740" y="468" width="130" height="62" rx="8" fill="#d7f7dd" stroke="#22c55e"/>
   <text x="805" y="503" text-anchor="middle" font-size="13" fill="#1e293b">Smoke test</text>
   <rect x="900" y="468" width="150" height="62" rx="8" fill="#ffe0e0" stroke="#ef4444"/>

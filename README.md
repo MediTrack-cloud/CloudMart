@@ -41,8 +41,8 @@ services depend on (RDS, DynamoDB, SQS, SES, Secrets Manager, KMS).
   Operator, Kyverno admission policies, WAF on the ALB, and GuardDuty threat detection.
 - **Delivery** — GitHub Actions CI (lint, test, build, Trivy scan, manifest validation)
   and CD (staging on `develop`, production on `main` with a manual approval gate,
-  pre-deploy Velero backup, smoke tests, and automatic rollback). Argo Rollouts drives a
-  canary for product-service; ArgoCD provides optional GitOps sync.
+  pre-deploy Velero backup, readiness-gated rolling deploys, post-deploy smoke tests, and
+  automatic rollback on failure).
 - **Observability** — CloudWatch dashboards (CPU/memory, request/error rate, queue
   depth, DB connections), per-service log groups, a product-service error-rate alarm, a
   custom order-throughput metric, and X-Ray distributed tracing.
@@ -60,7 +60,7 @@ CloudMart/
 │   ├── bootstrap/          # S3 state bucket + DynamoDB lock table
 │   ├── environments/       # prod/ and staging/ environment roots
 │   └── modules/            # Reusable modules (vpc, eks, rds, iam, monitoring, …)
-├── k8s/                    # Kubernetes manifests (Kustomize base + overlays, Helm charts)
+├── k8s/                    # Kubernetes manifests (Kustomize base + overlays; per-service Helm charts; add-on Helm values)
 ├── services/               # Microservice source code + Dockerfiles
 ├── docs/                   # ADRs, cost analysis, disaster-recovery plan
 ├── .github/workflows/      # CI / CD pipelines
@@ -108,13 +108,13 @@ Then in `terraform.tfvars` (env infra config) optionally set:
 ```bash
 aws eks update-kubeconfig --name cloudmart-prod --region us-east-1
 # Install controllers referenced by k8s/helm-values/ (LB controller, external-secrets,
-# metrics-server, cluster-autoscaler, kyverno, keda, argo-rollouts, argocd) via Helm.
+# metrics-server, cluster-autoscaler, kyverno, keda) via Helm.
 ```
 
 ### 4. Deploy the application
 
 ```bash
-# GitOps (preferred): push to develop -> staging, main -> production
+# Git-driven CD (preferred): push to develop -> staging, main -> production
 # or apply directly:
 kubectl apply -k k8s/overlays/prod
 kubectl get pods -n cloudmart-prod
@@ -135,7 +135,7 @@ docker compose up --build      # runs all five services with in-memory backends
 |--------|------|-----------------------|
 | Madhura Jayashanka | Platform / DevOps | Environment roots (prod/staging), CI/CD pipelines, monitoring & alarms, budgets, Velero/DR, cost & DR documentation |
 | Dilshan Prasanna Allepola | Core Infrastructure | Terraform networking (VPC) and managed-data modules — RDS, DynamoDB, SQS, S3, KMS, Route 53 |
-| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, external-secrets, ArgoCD, Kyverno policies, EKS/ECR |
+| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, external-secrets, Kyverno policies, EKS/ECR |
 | Akhila Sanjeewa | Application & Helm | Microservice source (product/order/user/notification), Helm charts and values files |
 | Himasha Kodikara | Security & Frontend | IAM/IRSA workload identity, secrets integration, frontend SPA and cross-service app wiring |
 

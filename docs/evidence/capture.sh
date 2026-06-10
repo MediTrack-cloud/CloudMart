@@ -54,14 +54,35 @@ fi
 echo "[SECURITY]"
 run "$DIR/security/EV-SEC-01-networkpolicy.txt"    "networkpolicies"  kubectl get networkpolicy -n "$NS"
 run "$DIR/security/EV-SEC-02-irsa-binding.txt"     "IRSA sa annotation" \
-    kubectl get sa product-service -n "$NS" -o yaml
+    kubectl get sa product-service-sa -n "$NS" -o yaml
 
-# GuardDuty: emit a sample finding so there is something to screenshot
+# GuardDuty: emit a sample finding so there is something to screenshot, then record
+# the resulting findings list. create-sample-findings is SILENT on success, so we
+# must capture list/get-findings output — otherwise the evidence file ends up empty.
+# Kubernetes/EKS finding types aren't sampleable on every detector; a core EC2
+# finding type (SSHBruteForce) is universally supported by create-sample-findings.
 DET="$(aws guardduty list-detectors --region "$REGION" --query 'DetectorIds[0]' --output text 2>/dev/null)"
+GD_OUT="$DIR/security/EV-SEC-03-guardduty-sample.txt"
 if [ -n "${DET:-}" ] && [ "$DET" != "None" ]; then
-  run "$DIR/security/EV-SEC-03-guardduty-sample.txt" "guardduty sample finding" \
-      aws guardduty create-sample-findings --region "$REGION" --detector-id "$DET" \
-        --finding-types "UnauthorizedAccess:EKS/MaliciousIPCaller.Custom"
+  printf '  - %-44s' "guardduty sample finding"
+  aws guardduty create-sample-findings --region "$REGION" --detector-id "$DET" \
+    --finding-types "UnauthorizedAccess:EC2/SSHBruteForce" >/dev/null 2>&1
+  {
+    echo "# GuardDuty sample finding evidence — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "# Detector: $DET   Region: $REGION"
+    echo "# Finding type generated: UnauthorizedAccess:EC2/SSHBruteForce"
+    echo ""
+    printf '%-5s  %-48s  %s\n' "SEV" "TYPE" "TITLE"
+    printf '%-5s  %-48s  %s\n' "-----" "------------------------------------------------" "------------------------------"
+    aws guardduty list-findings --region "$REGION" --detector-id "$DET" \
+      --query 'FindingIds' --output text 2>/dev/null | tr '\t' '\n' | while IFS= read -r id; do
+        [ -z "$id" ] && continue
+        aws guardduty get-findings --region "$REGION" --detector-id "$DET" --finding-ids "$id" \
+          --query 'Findings[0].[Severity,Type,Title]' --output text 2>/dev/null \
+          | awk -F'\t' '{printf "%-5s  %-48s  %s\n", $1, $2, $3}'
+      done
+  } > "$GD_OUT" 2>&1
+  if [ -s "$GD_OUT" ]; then echo "OK   -> ${GD_OUT#$DIR/}"; else echo "FAIL (see ${GD_OUT#$DIR/})"; fi
 else
   echo "  - guardduty sample finding                  SKIP (no detector)"
 fi

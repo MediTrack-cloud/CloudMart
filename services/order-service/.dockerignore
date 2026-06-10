@@ -6,5 +6,7 @@ Dockerfile*
 docker-compose*
 .github
 tests
+src/__tests__
+**/*.test.js
 coverage
 README.md

@@ -23,7 +23,7 @@
 
   <rect x="260" y="250" width="180" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
   <text x="350" y="277" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">product-service</text>
-  <text x="350" y="296" text-anchor="middle" font-size="12" fill="#475569">x2 · Svc:8001 · Argo canary</text>
+  <text x="350" y="296" text-anchor="middle" font-size="13" fill="#475569">x2 · Svc:8001</text>
 
   <rect x="470" y="250" width="160" height="70" rx="8" fill="#dceefb" stroke="#4a9eed"/>
   <text x="550" y="280" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">order-service</text>

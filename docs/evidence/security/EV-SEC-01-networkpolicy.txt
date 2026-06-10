@@ -1,0 +1,7 @@
+NAME                            POD-SELECTOR          AGE
+allow-dns-egress                <none>                3h4m
+allow-frontend                  app=frontend          3h4m
+allow-order-service-ingress     app=order-service     3h3m
+allow-product-service-ingress   app=product-service   3h3m
+allow-user-service-ingress      app=user-service      3h3m
+default-deny-all                <none>                3h3m

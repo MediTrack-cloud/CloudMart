@@ -10,7 +10,7 @@
 |--------|------|-----------------------|
 | Madhura Jayashanka | Platform / DevOps | Environment roots, CI/CD pipelines, monitoring & alarms, budgets, Velero/DR, cost & DR docs |
 | Dilshan Prasanna Allepola | Core Infrastructure | VPC networking and managed-data modules (RDS, DynamoDB, SQS, S3, KMS, Route 53) |
-| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, External Secrets, ArgoCD, Kyverno, EKS/ECR |
+| Asela Maduwantha | Kubernetes & GitOps | K8s base manifests, NetworkPolicies, Kustomize overlays, External Secrets, Kyverno, EKS/ECR |
 | Akhila Sanjeewa | Application & Helm | Microservice source (product/order/user/notification), Helm charts and values files |
 | Himasha Kodikara | Security & Frontend | IAM/IRSA workload identity, secrets integration, frontend SPA and cross-service wiring |
 
@@ -28,7 +28,7 @@ CloudMart has been re-platformed from a single-VM monolith into **five container
 - **Three-tier VPC** (`10.0.0.0/16`) across 2 AZs: public, private-app, private-data — databases have *no* route to the internet.
 - **Per-service least-privilege IAM via IRSA** — each pod assumes only the permissions its job requires (e.g. product-service can only read/write its DynamoDB table).
 - **Defence in depth** — WAF on the ALB, default-deny NetworkPolicies, Kyverno admission control, KMS encryption at rest, TLS in transit, GuardDuty threat detection.
-- **Progressive delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, Argo Rollouts canary, smoke tests and automatic rollback.
+- **Safe delivery** — GitHub Actions CI (test → Trivy scan → build → push → manifest validation) and CD with a manual approval gate, pre-deploy Velero backup, readiness-gated rolling deploys (`maxUnavailable:0`), post-deploy smoke tests and automatic rollback on failure.
 
 **Outcome metrics.**
 - **Cost:** ~**\$416/month** production, ~**\$343/month** staging on-demand; **\$41.60 per 1,000 orders** unit economics; a 1-year Reserved Instance plan saves **\$621/yr (37%)** on compute.
@@ -68,14 +68,14 @@ All five services run as Deployments in namespace **`cloudmart-prod`** (and **`c
 | Service | Replicas (prod) | Service type | Autoscaling |
 |---------|-----------------|--------------|-------------|
 | frontend (React/Nginx) | 2 | ClusterIP :80 (via Ingress/ALB) | — |
-| product-service (Flask) | 2 | ClusterIP :8001 | **HPA 60% CPU 2→6**; Argo canary |
+| product-service (Flask) | 2 | ClusterIP :8001 | **HPA 60% CPU 2→6** |
 | order-service (Express) | 2 | ClusterIP :8002 | **HPA 60% CPU 2→6** |
 | user-service (Flask) | 2 | ClusterIP :8003 | — |
 | notification-service (Node) | 1 | no Service (consumer) | **KEDA on SQS depth** |
 
 Every container declares **resource requests/limits**, **liveness + readiness probes**, a **rolling strategy `maxSurge:1 / maxUnavailable:0`**, a non-root `securityContext` (`readOnlyRootFilesystem`, dropped capabilities), and a **PodDisruptionBudget (minAvailable:1)**. The **Cluster Autoscaler** adds nodes (2→6) when pods cannot schedule; the **Metrics Server** feeds the HPAs. The **Ingress** uses the AWS Load Balancer Controller with ALB annotations (TLS 1.3 policy, WAF ACL attachment, `/health` health check).
 
-**Technology choices justified:** EKS managed node group on `m7i-flex.large` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); Argo Rollouts canary for the highest-traffic product-service (ADR-003).
+**Technology choices justified:** EKS managed node group on `m7i-flex.large` (ADR-001); RDS PostgreSQL for relational user data (ADR-002); a readiness-gated rolling update with automatic rollback for the highest-traffic product-service (ADR-003).
 
 ---
 
@@ -88,11 +88,11 @@ Every container declares **resource requests/limits**, **liveness + readiness pr
 | Threat | Vector | Control |
 |--------|--------|---------|
 | Spoofing | Stolen pod credentials | IRSA — short-lived, per-SA tokens; no static keys |
-| Tampering | Malicious image | Trivy CRITICAL gate + Kyverno "ECR-only" pull policy |
+| Tampering | Malicious image | Trivy CRITICAL gate (blocking) + Kyverno "ECR-only" enforce policy |
 | Repudiation | Untracked actions | CloudTrail (multi-region, log-file validation) |
 | Information disclosure | DB exposure | Private-data subnet, no internet route; KMS at rest; TLS in transit |
 | Denial of service | L7 flood | WAF rate-limit (2,000 req/5 min/IP) + AWS Shield Standard |
-| Elevation of privilege | Container breakout | Non-root, `readOnlyRootFilesystem`, drop ALL caps, Kyverno block-root/privileged |
+| Elevation of privilege | Container breakout | Non-root, `readOnlyRootFilesystem`, drop ALL caps, Kyverno enforce policy on root/privileged |
 
 ### 3.2 Network policy justification
 
@@ -121,7 +121,7 @@ The **EKS node role carries no application data permissions** — only `WorkerNo
 - **KMS CMKs** (app + rds) encrypt RDS, DynamoDB, SQS, Secrets Manager, ECR and S3 at rest.
 - **TLS in transit**: `rds.force_ssl=1` rejects non-SSL DB connections; the SQS queue policy denies non-TLS access (`aws:SecureTransport=false`).
 - **Secrets** live only in Secrets Manager and are projected into pods by the **External Secrets Operator** — no plaintext secrets in Git or images.
-- **Admission control (Kyverno):** block root containers, block privileged containers, enforce image pulls from our ECR registry, require resource limits.
+- **Admission policies (Kyverno, enforce mode):** block root/privileged containers, non-ECR images, and pods missing resource limits at admission. Policies run in `Enforce` (`validationFailureAction: Enforce`), so a non-compliant pod in the cloudmart namespaces is **rejected**, not just reported. All CloudMart workloads already comply (non-root, ECR images, resource limits), so enforcement is transparent in steady state.
 
 ### 3.5 Threat detection & WAF
 - **GuardDuty** is enabled (EKS audit logs, S3 logs, malware/EBS scanning); HIGH/CRITICAL findings (severity ≥ 7) route via EventBridge → SNS → email.
@@ -147,16 +147,16 @@ The **EKS node role carries no application data permissions** — only `WorkerNo
 
 ### 4.3 CD pipelines
 - **Staging** (`cd-staging.yml`) on merge to `develop`: kustomize image tag → apply `overlays/staging` → wait for rollout → smoke tests.
-- **Production** (`cd-prod.yml`) on merge to `main`: **manual approval gate** (GitHub Environment reviewers) → **pre-deploy Velero backup** → image tag bump → **Argo Rollouts canary** for product-service (20→40→100 %, **auto-abort if error rate > 1 %** via a CloudWatch AnalysisTemplate) → rolling update for the rest → **smoke tests** → **automatic rollback on failure**.
+- **Production** (`cd-prod.yml`) on merge to `main`: **manual approval gate** (GitHub Environment reviewers) → **pre-deploy Velero backup** → image tag bump → **readiness-gated rolling update** (`maxUnavailable:0`) across all services → **smoke tests** → **automatic rollback on failure** (`kubectl rollout undo`).
 
 ### 4.4 Deployment strategy rationale
-Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploys. The product-service (highest read volume) additionally uses a **canary** so a bad release reaches only 20 % of traffic and is automatically reverted before full promotion (ADR-003).
+Rolling update with `maxUnavailable:0` guarantees no capacity loss during deploys. Post-deploy smoke tests gate every production release, and any failure triggers an automatic `kubectl rollout undo`, so a bad release is reverted without manual intervention (ADR-003). A progressive (Argo Rollouts canary) strategy was evaluated and documented but dropped from the deploy path in favour of this lower-complexity, automatically-reversible approach.
 
 ### 4.5 Infrastructure as Code
 - All cloud resources are Terraform, organised as reusable modules (`vpc, eks, rds, dynamodb, sqs, ecr, iam, kms, s3, monitoring, security, waf, budgets, route53`) consumed by per-environment roots (`environments/prod`, `environments/staging`).
 - **Remote state** in S3 with **DynamoDB lock table** (bootstrapped separately).
 - Variables are parameterised per environment (instance class, NAT count, Multi-AZ, node counts, budget).
-- Kubernetes is managed with **Kustomize base + overlays** and **Helm charts** (per-service charts + an umbrella chart with staging/prod values); **ArgoCD** Applications provide optional GitOps sync.
+- Kubernetes workloads are deployed with **Kustomize base + overlays** (per-environment patches for namespace, replica counts and IRSA role ARNs). **Helm charts** are also provided (`k8s/helm/`: one chart per service plus an umbrella `cloudmart` chart with `values-staging`/`values-prod`) as an alternative packaging; the platform add-ons (Load Balancer Controller, External Secrets, KEDA, Kyverno, Cluster Autoscaler, Velero) are installed via **Helm**.
 
 ---
 
@@ -239,7 +239,7 @@ Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10
 
 **ADR-002 — user-service database (Accepted).** Compared managed PostgreSQL vs DynamoDB vs Aurora Serverless vs self-managed. Chose **RDS PostgreSQL db.t3.micro/small**: relational auth data (unique email, profile schema) needs strong consistency and joins; managed backups/PITR satisfy DR; ~\$13–55/mo. DynamoDB rejected (poor fit for relational queries); Aurora rejected (cost/overkill).
 
-**ADR-003 — product-service deployment strategy (Accepted).** Compared rolling / blue-green / canary. Chose **Argo Rollouts canary** (20→40→100 %) with a CloudWatch analysis gate that **aborts if error rate > 1 %**. Low blast radius and cheap (+1–2 pods) vs blue-green's 2× fleet; automated rollback suits the team's maturity.
+**ADR-003 — product-service deployment strategy (Accepted).** Compared rolling / blue-green / canary. Chose a **Kubernetes-native rolling update** (`maxSurge:1 / maxUnavailable:0`) **gated by post-deploy smoke tests with automatic `kubectl rollout undo` on failure**. No capacity loss during deploys and far fewer moving parts than a canary; an Argo Rollouts canary (20→40→100 % with a CloudWatch 1 %-error abort gate) was evaluated and documented but dropped from the deploy path as unnecessary complexity at this scale.
 
 ---
 
@@ -247,9 +247,9 @@ Single NAT in staging (–\$33/mo); DynamoDB on-demand billing; ECR keep-last-10
 
 **What worked well.** Treating *everything* as code made environments reproducible and the viva demo deterministic — `deploy.sh`/`destroy.sh` wrap the full lifecycle. IRSA gave genuinely least-privilege identity with no secret sprawl. The Trivy + Kyverno + NetworkPolicy layers caught issues at build, admission and runtime respectively.
 
-**What we'd do differently.** We would adopt GitOps (ArgoCD) as the *primary* deploy path from day one rather than an option alongside `kubectl apply`, and add contract tests between services to catch breaking API changes before the canary stage. We'd also right-size the NAT strategy earlier — interface endpoints and a single NAT in non-prod materially cut spend.
+**What we'd do differently.** We would adopt GitOps (e.g. ArgoCD) as the *primary* deploy path from day one rather than the current imperative `deploy.sh` + GitHub Actions flow, and add contract tests between services to catch breaking API changes before deploy. We'd also revisit progressive delivery (an Argo Rollouts canary) once traffic justifies the extra controller, and right-size the NAT strategy earlier — interface endpoints and a single NAT in non-prod materially cut spend.
 
-**Industry case study.** Our canary + automated-rollback design mirrors the post-incident practices popularised after large-scale outages such as the 2017 AWS S3 us-east-1 event and Knight Capital's 2012 deployment failure — both reinforce that *progressive, automatically-reversible* deploys with health gates are the difference between a contained blip and a company-level incident. CloudMart's 1 %-error abort gate is a direct application of that lesson.
+**Industry case study.** Our smoke-test-gated, automatically-reversible deploy design mirrors the post-incident practices popularised after large-scale outages such as the 2017 AWS S3 us-east-1 event and Knight Capital's 2012 deployment failure — both reinforce that *automatically-reversible* deploys with health gates are the difference between a contained blip and a company-level incident. CloudMart's automatic `rollout undo` on smoke-test failure is a direct application of that lesson.
 
 ---
 
@@ -303,8 +303,8 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | DB encrypted at rest + TLS | M | ✅ | KMS + `rds.force_ssl` |
 | IMDSv2 enforced | M | ✅ | EKS launch template |
 | Threat detection + finding/response | R | ✅ | GuardDuty + SNS (demo finding) |
-| WAF managed rules | R | ✅ | `modules/waf` / security module |
-| Policy engine (Kyverno) | D | ✅ | `k8s/security/kyverno-*` |
+| WAF managed rules | R | ✅ | `modules/security` (WAF v2) |
+| Policy engine (Kyverno) | D | ✅ | `k8s/security/kyverno-*` (enforce mode) |
 
 ### 3.5 CI/CD
 | Req | Lvl | Status | Evidence |
@@ -315,7 +315,7 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | Health-gated rolling deploy | M | ✅ | rollout status waits |
 | Manual approval gate | R | ✅ | `environment: production` |
 | Post-deploy smoke test | R | ✅ | cd smoke-test steps |
-| Canary w/ 1% error gate | D | ✅ | Argo Rollout + AnalysisTemplate (`>=0.99`) |
+| Automatic rollback on failure | R | ✅ | `cd-prod.yml` `Rollback on failure` (`rollout undo`) |
 
 ### 3.6 Observability
 | Req | Lvl | Status | Evidence |
@@ -333,8 +333,7 @@ Legend: ✅ implemented · M/R/D = Mandatory/Recommended/Distinction.
 | All infra in Terraform | M | ✅ | `infra/modules` + roots |
 | Remote state + locking | M | ✅ | `infra/bootstrap` |
 | Env-parameterised variables | M | ✅ | prod/staging tfvars |
-| Helm charts | R | ✅ | `k8s/helm` |
-| GitOps (ArgoCD) | D | ✅ | `k8s/argocd` |
+| Helm charts (per-service + umbrella, staging/prod values) | R | ✅ | `k8s/helm/` |
 
 ### 3.8 Cost
 | Req | Lvl | Status | Evidence |

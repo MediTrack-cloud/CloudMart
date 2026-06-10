@@ -1,0 +1,5 @@
+{
+    "Retention": 7,
+    "Window": "02:00-03:00",
+    "MultiAZ": true
+}
