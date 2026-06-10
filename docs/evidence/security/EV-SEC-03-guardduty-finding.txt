@@ -1,0 +1,18 @@
+# ──────────────────────────────────────────────────────────────────
+# EV-SEC-03  GuardDuty active findings (detector 16cf3e91f8149e899bdbf8034d538e27)
+#
+# Command (re-run any time with: export AWS_PROFILE=cims AWS_REGION=us-east-1):
+#   aws guardduty get-findings --region us-east-1 --detector-id 16cf3e91f8149e899bdbf8034d538e27 --finding-ids $(aws guardduty list-findings --region us-east-1 --detector-id 16cf3e91f8149e899bdbf8034d538e27 --max-results 10 --query 'FindingIds' --output text) --query 'Findings[].{Severity:Severity,Type:Type,Title:Title}' --output table
+#
+# Captured: 2026-05-31 16:43:51Z   account=898865655202  env=prod
+# ──────────────────────────────────────────────────────────────────
+
+--------------------------------------------------------------------------------------------------------------------------------
+|                                                          GetFindings                                                         |
++----------+--------------------------------------------------------------------------+----------------------------------------+
+| Severity |                                  Title                                   |                 Type                   |
++----------+--------------------------------------------------------------------------+----------------------------------------+
+|  2.0     |  An unprotected port on EC2 instance i-99999999 is being probed.         |  Recon:EC2/PortProbeUnprotectedPort    |
+|  2.0     |  198.51.100.0 is performing SSH brute force attacks against i-99999999.  |  UnauthorizedAccess:EC2/SSHBruteForce  |
+|  2.0     |  The API DescribeMetricFilters was invoked using root credentials.       |  Policy:IAMUser/RootCredentialUsage    |
++----------+--------------------------------------------------------------------------+----------------------------------------+
