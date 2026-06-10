@@ -51,7 +51,7 @@ const styles = {
   cardPrice: {
     fontSize: "22px",
     fontWeight: "bold",
-    color: "#e94560",
+    color: "#e9933d",
     margin: "8px 0",
   },
   badge: {
