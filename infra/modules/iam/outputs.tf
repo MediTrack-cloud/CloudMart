@@ -26,6 +26,10 @@ output "xray_role_arn" {
   value = aws_iam_role.xray.arn
 }
 
+output "fluent_bit_role_arn" {
+  value = aws_iam_role.fluent_bit.arn
+}
+
 output "keda_operator_role_arn" {
   value = aws_iam_role.keda_operator.arn
 }
