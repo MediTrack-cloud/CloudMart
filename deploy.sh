@@ -138,7 +138,6 @@ GH_ROLE_ARN=$(terraform output -raw github_actions_role)
 WAF_ARN=$(terraform output -raw waf_arn)
 VELERO_ROLE_ARN=$(terraform output -raw velero_role_arn)
 XRAY_ROLE_ARN=$(terraform output -raw xray_role_arn)
-FLUENT_BIT_ROLE_ARN=$(terraform output -raw fluentbit_role_arn)
 KEDA_ROLE_ARN=$(terraform output -raw keda_operator_role_arn)
 SQS_URL=$(terraform output -raw sqs_queue_url)
 VPC_ID=$(aws ec2 describe-vpcs --region "$AWS_REGION" \
@@ -254,18 +253,7 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
   --set serviceAccount.create=true \
   --set serviceAccount.name=external-secrets-sa \
   --set "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$ES_ROLE_ARN"
-helm upgrade --install aws-for-fluent-bit eks/aws-for-fluent-bit \
-  -n kube-system --wait \
-  --set serviceAccount.create=true \
-  --set serviceAccount.name=aws-for-fluent-bit \
-  --set "serviceAccount.annotations.eks\\\.amazonaws\\\.com/role-arn=$FLUENT_BIT_ROLE_ARN" \
-  --set cloudWatchLogs.enabled=true \
-  --set cloudWatchLogs.region="$AWS_REGION" \
-  --set cloudWatchLogs.logGroupName="/cloudmart/eks/logs" \
-  --set-string cloudWatchLogs.logGroupTemplate='/cloudmart/$kubernetes["labels"]["app"]/$kubernetes["namespace_name"]' \
-  --set-string cloudWatchLogs.logStreamTemplate='$kubernetes["pod_name"].$kubernetes["container_name"]' \
-  --set cloudWatchLogs.autoCreateGroup=true \
-  --set cloudWatchLogs.logRetentionDays=14
+
 helm upgrade --install keda kedacore/keda \
   -n keda --create-namespace --wait \
   -f "$K8S_DIR/helm-values/keda.yaml"

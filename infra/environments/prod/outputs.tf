@@ -7,7 +7,6 @@ output "rds_secret_name" { value = module.rds.secret_name }
 output "irsa_role_arns" { value = module.iam.irsa_role_arns }
 output "external_secrets_role" { value = module.iam.external_secrets_role_arn }
 output "lb_controller_role" { value = module.iam.lb_controller_role_arn }
-output "fluentbit_role_arn" { value = module.iam.fluent_bit_role_arn }
 output "cluster_autoscaler_role" { value = module.iam.cluster_autoscaler_role_arn }
 output "github_actions_role" { value = module.iam.github_actions_role_arn }
 output "waf_arn" { value = module.security.waf_arn }
