@@ -13,6 +13,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote, unquote
 
 from flask import Flask, jsonify, request, abort
 import bcrypt
@@ -116,6 +117,28 @@ class InMemoryUserStore:
 # ---------------------------------------------------------------------------
 # PostgreSQL store (AWS RDS)
 # ---------------------------------------------------------------------------
+def normalize_database_url(dsn):
+    if isinstance(dsn, str) and dsn.startswith(("postgres://", "postgresql://")):
+        try:
+            urlparse(dsn)
+            return dsn
+        except Exception:
+            try:
+                scheme, rest = dsn.split("://", 1)
+            except ValueError:
+                return dsn
+            if "@" not in rest:
+                return dsn
+            auth_part, host_part = rest.rsplit("@", 1)
+            if ":" not in auth_part:
+                return dsn
+            username, password = auth_part.split(":", 1)
+            username = quote(unquote(username), safe="")
+            password = quote(unquote(password), safe="")
+            return f"{scheme}://{username}:{password}@{host_part}"
+    return dsn
+
+
 class PostgresUserStore:
     """
     PostgreSQL adapter for Amazon RDS.
@@ -129,7 +152,7 @@ class PostgresUserStore:
         import psycopg2.extras
         self._psycopg2 = psycopg2
         self._extras = psycopg2.extras
-        self._dsn = os.environ["DATABASE_URL"]
+        self._dsn = normalize_database_url(os.environ["DATABASE_URL"])
         self._init_schema()
         logger.info("PostgreSQL user store initialised (RDS)")
 
