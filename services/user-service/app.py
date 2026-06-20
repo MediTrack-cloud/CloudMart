@@ -13,7 +13,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlparse
 
 from flask import Flask, jsonify, request, abort
 import bcrypt
