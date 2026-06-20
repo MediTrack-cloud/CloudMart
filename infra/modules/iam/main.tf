@@ -445,6 +445,32 @@ resource "aws_iam_role_policy_attachment" "xray" {
 }
 
 # ---------------------------------------------------------------------------
+# aws-for-fluent-bit log shipping role (IRSA)
+# ---------------------------------------------------------------------------
+resource "aws_iam_role" "fluent_bit" {
+  name = "cloudmart-fluent-bit-role-${var.environment}"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
+      Principal = { Federated = var.oidc_provider_arn }
+      Condition = {
+        StringEquals = {
+          "${local.oidc_host}:sub" = "system:serviceaccount:kube-system:aws-for-fluent-bit"
+          "${local.oidc_host}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "fluent_bit" {
+  role       = aws_iam_role.fluent_bit.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# ---------------------------------------------------------------------------
 # KEDA operator role (IRSA) — queries SQS queue depth for autoscaling
 # ---------------------------------------------------------------------------
 resource "aws_iam_role" "keda_operator" {
